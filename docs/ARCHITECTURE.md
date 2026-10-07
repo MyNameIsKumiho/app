@@ -22,10 +22,14 @@
 apps/web (Next.js App Router)
  ├─ UI (React, Tailwind, TanStack Query)        ← только отображение и ввод
  ├─ app/api/*  (route handlers = backend API)   ← Zod-валидация входа, без бизнес-логики
+ ├─ lib/           Общие DTO, PlayerView (что видит игрок), клиент API
  └─ server/
-     ├─ db/            Drizzle + SQLite (better-sqlite3)
-     ├─ repositories/  Persistence
-     └─ services/      Оркестрация: StoryService, CreatorService, ImageService
+     ├─ db/            Drizzle + SQLite (better-sqlite3), миграции
+     ├─ ai.ts          Сборка провайдеров из env, AIRouter, статус для Settings
+     ├─ scenarios.ts   Сценарии: библиотека, публикация, ремикс, import/export, снимки
+     ├─ stories.ts     Истории: ход с блокировкой, дерево ходов, перемотка, сохранения, иллюстрации
+     ├─ creator.ts     Операции создателя (всё возвращается как предложение)
+     └─ settings.ts    Пользовательские настройки (без ключей)
 packages/core (чистый TypeScript, без React/Next/БД — легко тестировать и переносить)
  ├─ domain/         Zod-схемы: Scenario, GameState, Ability, NPC, Memory, Actions, AI-ответы
  ├─ engine/         Game Engine: применение изменений, время, timeline/divergence, отношения
@@ -33,7 +37,7 @@ packages/core (чистый TypeScript, без React/Next/БД — легко т
  ├─ context/        Context Engine: сборка контекста по бюджету
  ├─ memory/         Memory Engine: память NPC, уровни памяти, importance
  ├─ ai/             AI Router, интерфейс провайдера, структурированный вывод (repair/retry), промпты
- │   └─ providers/  ClaudeProvider, OpenAIProvider, MockProvider
+ │   └─ providers/  ClaudeProvider, OpenAIProvider, CodexCliProvider (подписка ChatGPT), MockProvider
  ├─ image/          ImageProvider, OpenAIImageProvider, MockImageProvider, промпт из Visual Profile
  ├─ creator/        AI Scenario Creator: wizard, draft, ассистент редактора (patch-предложения)
  └─ demo/           Оригинальный демо-сценарий «Aetherfall Academy»
@@ -46,6 +50,11 @@ packages/core (чистый TypeScript, без React/Next/БД — легко т
 **Desktop (Tauri):** Tauri-оболочка запускает Next.js-сервер как sidecar и
 открывает его в окне. В MVP приложение запускается как web (`pnpm dev`);
 Tauri-обёртка — следующий этап (см. план), архитектура под неё готова.
+
+**Что видит игрок.** Браузер никогда не получает сценарий целиком, если это
+не ваш собственный черновик: экран игры получает `PlayerView`, а страница
+сценария `PublicScenario`. Секреты NPC, скрытые события, скрытые оси и числа
+отношений остаются на сервере.
 
 **State management:** серверное состояние (сценарии, игры, ходы) — TanStack Query:
 кэш, loading/error из коробки, инвалидация после хода. Локальное UI-состояние —
@@ -120,8 +129,9 @@ interface AIProvider {
 | `/create` | Выбор: AI Wizard или пустой сценарий |
 | `/create/wizard` | Wizard: идея → вопросы → варианты → draft → правки → проверка → публикация |
 | `/scenarios/[id]/edit` | Продвинутый редактор + постоянный AI-ассистент |
-| `/play/new/[scenarioId]` | Создание персонажа |
-| `/play/[storyId]` | Экран истории + панель персонажа + сохранения |
+| `/scenarios/[id]/new` | Создание персонажа (вручную или AI-варианты) |
+| `/stories` | Все истории |
+| `/stories/[id]` | Экран истории + панель персонажа + сохранения и перемотка |
 | `/settings` | AI-настройки (Story/Fallback/Image, Advanced скрыт) |
 
 ## 9. План реализации

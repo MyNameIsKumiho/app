@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #07080d;
+  --color-ink-900: #0c0e16;
+  --color-ink-850: #10131d;
+  --color-ink-800: #151927;
+  --color-ink-700: #1d2233;
+  --color-ink-600: #2a3046;
+  --color-parchment: #ece6d8;
+  --color-mist: #a8a5b6;
+  --color-fog: #6f6c80;
+  --color-aether: #8fa2ff;
+  --color-aether-deep: #5b6be0;
+  --color-ember: #e0a85c;
+  --color-rose: #e07a8f;
+  --color-jade: #6fd1a6;
+  --color-system: #6fd3ff;
+
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  @keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+  }
+  @keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+  }
+}
+
+@layer base {
+  html { color-scheme: dark; }
+  body {
+  @apply bg-ink-950 text-parchment font-sans antialiased;
+  min-height: 100dvh;
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, rgb(91 107 224 / 0.16), transparent 60%),
+    radial-gradient(50rem 35rem at 110% 10%, rgb(224 168 92 / 0.08), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 120%, rgb(111 211 255 / 0.06), transparent 60%);
+  background-attachment: fixed;
+  }
+  ::selection { background: rgb(143 162 255 / 0.35); }
+  * { scrollbar-width: thin; scrollbar-color: var(--color-ink-600) transparent; }
+  :focus-visible { outline: 2px solid var(--color-aether); outline-offset: 2px; }
+}
+
+@utility panel {
+  @apply rounded-2xl border border-white/[0.07] bg-ink-850/80 backdrop-blur-sm;
+}
+@utility panel-raised {
+  @apply rounded-xl border border-white/[0.08] bg-ink-800;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-aether-deep text-white shadow-[0_0_24px_-6px_var(--color-aether-deep)] hover:bg-aether hover:text-ink-950;
+}
+@utility btn-ghost {
+  @apply btn border border-white/10 bg-white/[0.03] text-parchment hover:border-aether/50 hover:bg-aether/10;
+}
+@utility btn-quiet {
+  @apply btn px-2.5 py-1.5 text-mist hover:bg-white/5 hover:text-parchment;
+}
+@utility btn-danger {
+  @apply btn border border-rose/30 bg-rose/10 text-rose hover:bg-rose/20;
+}
+@utility input {
+  @apply w-full rounded-xl border border-white/10 bg-ink-900/80 px-3 py-2 text-sm text-parchment placeholder:text-fog focus:border-aether/60 focus:outline-none;
+}
+@utility label {
+  @apply mb-1 block text-xs font-medium tracking-wide text-mist uppercase;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-xs text-mist;
+}
+@utility chip-active {
+  @apply border-aether/60 bg-aether/15 text-parchment;
+}
+@utility prose-story {
+  @apply font-serif text-[1.075rem] leading-[1.85] text-parchment/95;
+}
+@utility system-window {
+  @apply my-3 rounded-lg border border-system/40 bg-system/[0.07] px-4 py-2 font-sans text-sm text-system shadow-[0_0_30px_-12px_var(--color-system)];
+}
+@utility skeleton {
+  @apply rounded-lg bg-ink-700;
+  background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), transparent);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@layer components {
+  .prose-story p + p {
+    margin-top: 1rem;
+  }
+}

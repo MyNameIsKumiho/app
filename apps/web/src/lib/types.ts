@@ -1,5 +1,6 @@
 import type { PlayerAction, Scenario, SuggestedAction, ValidationReport } from "@aetherfall/core";
 import type { PlayerView } from "./playerView";
+import type { PublicScenario } from "./publicScenario";
 
 /** DTOs shared by API routes and the UI. */
 
@@ -26,8 +27,10 @@ export interface ScenarioCard {
 
 export interface ScenarioDetail {
   card: ScenarioCard;
-  scenario: Scenario;
-  validation: ValidationReport;
+  public: PublicScenario;
+  /** Full data: only for the author's own scenarios (editing). */
+  scenario: Scenario | null;
+  validation: ValidationReport | null;
 }
 
 export interface TurnReport {

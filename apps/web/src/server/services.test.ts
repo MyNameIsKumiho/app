@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AIRouter, MockImageProvider, MockProvider, type AIProvider } from "@aetherfall/core/server";
 import { createMemoryDb } from "./db/client";
-import { createScenario, exportScenarioFile, getScenarioDetail, importScenarioFile, listScenarios, publishScenario, remix, seedBuiltins, updateScenario } from "./scenarios";
+import { createScenario, loadScenario, exportScenarioFile, getScenarioDetail, importScenarioFile, listScenarios, publishScenario, remix, seedBuiltins, updateScenario } from "./scenarios";
 import { readSettings, writeSettings } from "./settings";
 import { addNote, createManualSave, createStory, getStoryDetail, illustrateTurn, listSaves, loadSave, playStoryTurn, rewindStory, type StoryDeps } from "./stories";
 import { runCreator } from "./creator";
@@ -72,7 +72,7 @@ describe("stories", () => {
     const card = createScenario(deps.db, { title: "Мой мир", authorName: "Игрок" });
     const { id } = createStory(deps.db, { scenarioId: card.id, character: { name: "Ая" } });
     const detail = getScenarioDetail(deps.db, card.id);
-    updateScenario(deps.db, card.id, { ...detail.scenario, locations: [{ id: "start", name: "Переименованная локация" }] });
+    updateScenario(deps.db, card.id, { ...detail.scenario!, locations: [{ id: "start", name: "Переименованная локация" }] });
     const story = getStoryDetail(deps.db, id, deps.settings);
     expect(story.view.location.name).toBe("Начальная локация");
   });
@@ -105,12 +105,16 @@ describe("scenarios", () => {
 
   it("creator returns proposals without saving them", async () => {
     const deps = setup();
-    const detail = getScenarioDetail(deps.db, "aetherfall-academy");
+    const detail = { scenario: loadScenario(deps.db, "aetherfall-academy") };
+    const load = (id: string) => loadScenario(deps.db, id);
     const before = listScenarios(deps.db, { scope: "mine" }).length;
-    const res = (await runCreator(deps.ai, { op: "revise", scenario: detail.scenario, instruction: "Добавь больше политики" })) as { patch: unknown };
+    const res = (await runCreator(deps.ai, { op: "revise", scenario: detail.scenario, instruction: "Добавь больше политики" }, load)) as { patch: unknown };
     expect(res.patch).toBeTruthy();
-    const applied = (await runCreator(deps.ai, { op: "apply_patch", scenario: detail.scenario, patch: res.patch })) as { scenario: { factions: unknown[] } };
+    const applied = (await runCreator(deps.ai, { op: "apply_patch", scenario: detail.scenario, patch: res.patch }, load)) as { scenario: { factions: unknown[] } };
     expect(applied.scenario.factions.length).toBe(detail.scenario.factions.length + 1);
     expect(listScenarios(deps.db, { scope: "mine" }).length).toBe(before);
+    const chars = (await runCreator(deps.ai, { op: "characters", scenarioId: "aetherfall-academy", request: "" }, load)) as { characters: unknown[] };
+    expect(chars.characters).toHaveLength(3);
+    expect(getScenarioDetail(deps.db, "aetherfall-academy").scenario).toBeNull();
   });
 });

@@ -12,6 +12,7 @@ import {
   validateScenario,
   type Scenario,
 } from "@aetherfall/core/server";
+import { toPublicScenario } from "@/lib/publicScenario";
 import type { ScenarioCard, ScenarioDetail } from "@/lib/types";
 import type { DB } from "./db/client";
 import { scenarioSnapshots, scenarios } from "./db/schema";
@@ -116,7 +117,8 @@ export function getScenarioDetail(db: DB, id: string): ScenarioDetail {
   const row = getRow(db, id);
   const titles = new Map(db.select({ id: scenarios.id, title: scenarios.title }).from(scenarios).all().map((r) => [r.id, r.title]));
   const scenario = ScenarioSchema.parse(row.data);
-  return { card: toCard(row, titles), scenario, validation: validateScenario(scenario) };
+  const editable = row.isOwn && !row.isBuiltin;
+  return { card: toCard(row, titles), public: toPublicScenario(scenario), scenario: editable ? scenario : null, validation: editable ? validateScenario(scenario) : null };
 }
 
 /** Starter content so a blank scenario is technically playable right away. */

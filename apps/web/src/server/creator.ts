@@ -14,6 +14,7 @@ import {
   reviewScenario,
   validateScenario,
   type FieldAction,
+  type Scenario,
   type TextGenerator,
 } from "@aetherfall/core/server";
 import { ApiError } from "./http";
@@ -53,11 +54,12 @@ export const CreatorRequestSchema = z.discriminatedUnion("op", [
   }),
   z.object({ op: z.literal("review"), scenario: z.unknown() }),
   z.object({ op: z.literal("validate"), scenario: z.unknown() }),
-  z.object({ op: z.literal("characters"), scenario: z.unknown(), request: z.string().max(2000).default("") }),
+  z.object({ op: z.literal("characters"), scenarioId: z.string().min(1), request: z.string().max(2000).default("") }),
 ]);
 export type CreatorRequest = z.input<typeof CreatorRequestSchema>;
 
-export async function runCreator(ai: TextGenerator, raw: unknown): Promise<unknown> {
+/** `loadScenario` resolves ids for players who only see the public scenario view. */
+export async function runCreator(ai: TextGenerator, raw: unknown, loadScenario: (id: string) => Scenario): Promise<unknown> {
   const req = CreatorRequestSchema.parse(raw);
   const scenarioOf = (value: unknown) => {
     const parsed = ScenarioSchema.safeParse(value);
@@ -89,6 +91,6 @@ export async function runCreator(ai: TextGenerator, raw: unknown): Promise<unkno
     case "validate":
       return validateScenario(scenarioOf(req.scenario));
     case "characters":
-      return generateCharacters(ai, { scenario: scenarioOf(req.scenario), request: req.request });
+      return generateCharacters(ai, { scenario: loadScenario(req.scenarioId), request: req.request });
   }
 }
