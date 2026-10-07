@@ -1,9 +1,10 @@
+import { MAX_USER_TEXT } from "@aetherfall/core";
 import { z } from "zod";
 import { db } from "@/server/context";
 import { readJson, route, type IdParams } from "@/server/http";
 import { addNote, deleteNote } from "@/server/stories";
 
-const NoteSchema = z.object({ text: z.string().min(1).max(4000) });
+const NoteSchema = z.object({ text: z.string().min(1).max(MAX_USER_TEXT) });
 
 export const POST = route<IdParams>(async (request, { params }) => {
   addNote(db(), (await params).id, NoteSchema.parse(await readJson(request)).text);

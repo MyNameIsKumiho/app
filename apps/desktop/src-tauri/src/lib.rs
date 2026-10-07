@@ -27,8 +27,9 @@ ANTHROPIC_API_KEY=\n\
 # OpenAI API key (also used for illustrations)\n\
 OPENAI_API_KEY=\n\
 \n\
-# ChatGPT subscription via the official Codex CLI: install it (npm i -g @openai/codex),\n\
-# run `codex login` and choose \"Sign in with ChatGPT\". Set CODEX_BIN if it is not on PATH.\n\
+# ChatGPT subscription via the official Codex CLI. Aetherfall finds it by itself: the Codex app\n\
+# (including the Microsoft Store one) or `npm i -g @openai/codex`. Sign in once with \"Sign in with ChatGPT\".\n\
+# CODEX_BIN is only needed for a CLI in an unusual place.\n\
 CHATGPT_SUBSCRIPTION_ENABLED=true\n\
 CODEX_BIN=\n";
 

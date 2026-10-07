@@ -26,7 +26,7 @@ Production-сборка: `pnpm build && pnpm start`. Проверки: `pnpm che
 |---|---|---|
 | Claude API | `ANTHROPIC_API_KEY` | API-кредиты Anthropic |
 | OpenAI API | `OPENAI_API_KEY` (также рисует иллюстрации) | API-кредиты OpenAI |
-| Подписка ChatGPT | Официальный Codex CLI: `npm i -g @openai/codex`, затем `codex login` → «Sign in with ChatGPT» | Лимит вашей подписки ChatGPT |
+| Подписка ChatGPT | Официальный Codex: приложение Codex (в том числе из Microsoft Store) или `npm i -g @openai/codex`, вход «Sign in with ChatGPT». Приложение находит CLI само | Лимит вашей подписки ChatGPT |
 | Демо-рассказчик | Ничего, включается сам, если нет других | Ничего |
 
 По умолчанию рассказчик выбирается автоматически: Claude, затем ChatGPT-подписка, затем OpenAI. Запасного рассказчика на случай лимитов и сбоев можно выбрать в «Настройки → AI-рассказчик».

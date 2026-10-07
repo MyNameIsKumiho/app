@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  MAX_USER_TEXT,
   FIELD_ACTION_LABELS,
   ScenarioPatchSchema,
   ScenarioSchema,
@@ -28,33 +29,33 @@ import { newScenarioId } from "./scenarios";
 const FieldActionSchema = z.enum(Object.keys(FIELD_ACTION_LABELS) as [FieldAction, ...FieldAction[]]);
 
 export const CreatorRequestSchema = z.discriminatedUnion("op", [
-  z.object({ op: z.literal("analyze"), idea: z.string().trim().min(10, "Опишите идею хотя бы одним предложением").max(6000) }),
+  z.object({ op: z.literal("analyze"), idea: z.string().trim().min(10, "Опишите идею хотя бы одним предложением").max(MAX_USER_TEXT) }),
   z.object({
     op: z.literal("draft"),
-    idea: z.string().trim().min(10).max(6000),
+    idea: z.string().trim().min(10).max(MAX_USER_TEXT),
     answers: z.array(z.object({ questionId: z.string(), question: z.string(), answer: z.string() })).max(30),
     authorName: z.string().trim().min(1).max(80),
   }),
-  z.object({ op: z.literal("revise"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(3000) }),
-  z.object({ op: z.literal("alternatives"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(3000) }),
+  z.object({ op: z.literal("revise"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(MAX_USER_TEXT) }),
+  z.object({ op: z.literal("alternatives"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(MAX_USER_TEXT) }),
   z.object({ op: z.literal("apply_patch"), scenario: z.unknown(), patch: z.unknown() }),
   z.object({
     op: z.literal("field"),
     scenario: z.unknown(),
     fieldLabel: z.string().min(1).max(200),
-    value: z.string().max(20000),
+    value: z.string().max(MAX_USER_TEXT),
     action: FieldActionSchema,
-    wish: z.string().max(2000).optional(),
+    wish: z.string().max(MAX_USER_TEXT).optional(),
   }),
   z.object({
     op: z.literal("assistant"),
     scenario: z.unknown(),
-    message: z.string().trim().min(1).max(4000),
-    history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) })).max(20).default([]),
+    message: z.string().trim().min(1).max(MAX_USER_TEXT),
+    history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(MAX_USER_TEXT) })).max(20).default([]),
   }),
   z.object({ op: z.literal("review"), scenario: z.unknown() }),
   z.object({ op: z.literal("validate"), scenario: z.unknown() }),
-  z.object({ op: z.literal("characters"), scenarioId: z.string().min(1), request: z.string().max(2000).default("") }),
+  z.object({ op: z.literal("characters"), scenarioId: z.string().min(1), request: z.string().max(MAX_USER_TEXT).default("") }),
 ]);
 export type CreatorRequest = z.input<typeof CreatorRequestSchema>;
 

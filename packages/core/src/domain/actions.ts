@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_USER_TEXT } from "./common";
 
 export const EMOTIONS = [
   { id: "calm", label: "Спокойствие" },
@@ -18,10 +19,10 @@ export type EmotionId = (typeof EMOTIONS)[number]["id"];
 const EmotionIdSchema = z.enum(EMOTIONS.map((e) => e.id) as [EmotionId, ...EmotionId[]]);
 
 export const ActionPartSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("say"), text: z.string().min(1).max(4000) }),
-  z.object({ kind: z.literal("do"), text: z.string().min(1).max(4000) }),
+  z.object({ kind: z.literal("say"), text: z.string().min(1).max(MAX_USER_TEXT) }),
+  z.object({ kind: z.literal("do"), text: z.string().min(1).max(MAX_USER_TEXT) }),
   /** Inner monologue. NPCs never hear it. */
-  z.object({ kind: z.literal("think"), text: z.string().min(1).max(4000) }),
+  z.object({ kind: z.literal("think"), text: z.string().min(1).max(MAX_USER_TEXT) }),
   z.object({ kind: z.literal("silent") }),
   z.object({ kind: z.literal("emotion"), emotion: EmotionIdSchema, intensity: z.number().int().min(1).max(5).default(3) }),
   z.object({ kind: z.literal("ability"), abilityId: z.string().min(1), target: z.string().max(500).optional() }),
@@ -33,7 +34,7 @@ export const ActionPartSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("travel"), locationId: z.string().min(1) }),
   z.object({ kind: z.literal("rest"), activity: z.enum(["wait", "sleep", "train", "study"]), minutes: z.number().int().min(5).max(60 * 24 * 7) }),
-  z.object({ kind: z.literal("free"), text: z.string().min(1).max(4000) }),
+  z.object({ kind: z.literal("free"), text: z.string().min(1).max(MAX_USER_TEXT) }),
 ]);
 export type ActionPart = z.infer<typeof ActionPartSchema>;
 

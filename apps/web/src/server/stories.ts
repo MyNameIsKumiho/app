@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import {
+  MAX_USER_TEXT,
   GameStateSchema,
   PlayerActionSchema,
   buildImagePrompt,
@@ -367,7 +368,7 @@ function updateState(db: DB, storyId: string, fn: (state: GameState) => void): G
 }
 
 export function addNote(db: DB, storyId: string, text: string): void {
-  const clean = text.trim().slice(0, 4000);
+  const clean = text.trim().slice(0, MAX_USER_TEXT);
   if (!clean) throw new ApiError(400, "Пустая заметка");
   updateState(db, storyId, (state) => state.journal.notes.push({ id: newId("note"), text: clean, createdAt: now() }));
 }

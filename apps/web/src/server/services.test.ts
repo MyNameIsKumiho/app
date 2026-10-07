@@ -117,4 +117,12 @@ describe("scenarios", () => {
     expect(chars.characters).toHaveLength(3);
     expect(getScenarioDetail(deps.db, "aetherfall-academy").scenario).toBeNull();
   });
+
+  it("accepts long ideas and instructions", async () => {
+    const deps = setup();
+    const idea = "Огромный мир с долгой историей. ".repeat(1000);
+    expect(idea.length).toBeGreaterThan(30_000);
+    const res = (await runCreator(deps.ai, { op: "analyze", idea }, (id) => loadScenario(deps.db, id))) as object;
+    expect(res).toBeTruthy();
+  });
 });

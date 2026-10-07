@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { GAME_STATE_VERSION, GameStateSchema, type GameState, type NPCState } from "../domain/gameState";
 import type { Scenario } from "../domain/scenario";
+import { MAX_USER_TEXT } from "../domain/common";
 import { toMinutes } from "../domain/time";
 import { addItem, findItem } from "../engine/mutations";
 import { markDiscovered, markVisited, presentNpcIds } from "../engine/world";
 
 export const CharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Нужно имя").max(80),
-  fields: z.record(z.string(), z.string().max(4000)).default({}),
+  fields: z.record(z.string(), z.string().max(MAX_USER_TEXT)).default({}),
   /** Extra attribute points distributed by the player: statId -> points. */
   attributeAllocation: z.record(z.string(), z.number().int().min(0)).default({}),
   visualProfile: z.record(z.string(), z.string()).default({}),

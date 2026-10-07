@@ -119,7 +119,7 @@ export default function SettingsPage() {
               <b className="text-parchment">OpenAI API.</b> Аналогично: <code>OPENAI_API_KEY</code>. Этот же ключ используется для иллюстраций.
             </p>
             <p>
-              <b className="text-parchment">Подписка ChatGPT (без трат API).</b> Установите официальный Codex CLI (<code>npm i -g @openai/codex</code>), выполните <code>codex login</code> и выберите «Sign in with ChatGPT». Приложение вызывает CLI на этом компьютере, и запросы идут в лимит вашей подписки. Данные входа остаются внутри CLI: приложение их не читает и не хранит. Работает только когда приложение запущено на вашем компьютере.
+              <b className="text-parchment">Подписка ChatGPT (без трат API).</b> Нужен официальный Codex: приложение Codex (в том числе из Microsoft Store) или <code>npm i -g @openai/codex</code>. Aetherfall находит его сам. Войдите в Codex через «Sign in with ChatGPT». Приложение вызывает CLI на этом компьютере, и запросы идут в лимит вашей подписки. Данные входа остаются внутри CLI: приложение их не читает и не хранит. Работает только когда приложение запущено на вашем компьютере.
             </p>
             <p>
               <b className="text-parchment">Подписка Claude.</b> Anthropic запрещает использовать вход по подписке Claude (Pro/Max) в сторонних приложениях, поэтому здесь доступен только Claude по API-ключу.

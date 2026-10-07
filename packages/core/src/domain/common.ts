@@ -14,7 +14,13 @@ export const ImportanceSchema = z.number().int().min(0).max(100);
 /** Importance at or above which a memory is permanent and never pruned. */
 export const PERMANENT_IMPORTANCE = 80;
 
-export const TextSchema = z.string().max(20_000);
+/**
+ * Upper bound for any text a person types. It only guards the server against
+ * runaway requests; nobody writing a story should ever reach it.
+ */
+export const MAX_USER_TEXT = 500_000;
+
+export const TextSchema = z.string().max(MAX_USER_TEXT);
 export const ShortTextSchema = z.string().max(500);
 
 /** Turns any human label into a valid id ("Огненный шар" -> "ognennyi-shar"). */

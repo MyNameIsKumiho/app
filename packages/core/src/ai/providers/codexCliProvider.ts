@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { locateCodex } from "./codexLocator";
 import { AIError, redactSecrets, type AIProvider, type ProviderStatus, type TextRequest, type TextResult } from "../types";
 
 /**
@@ -15,7 +16,7 @@ import { AIError, redactSecrets, type AIProvider, type ProviderStatus, type Text
  * Works only where the backend runs on the user's own machine (desktop/local).
  */
 export interface CodexCliOptions {
-  /** Path to the `codex` binary. */
+  /** Path to the `codex` binary. When unset the CLI is looked up on this machine. */
   bin?: string;
   model?: string;
   timeoutMs?: number;
@@ -64,11 +65,14 @@ export class CodexCliProvider implements AIProvider {
   readonly label = "ChatGPT (подписка через Codex CLI)";
   readonly kind = "subscription" as const;
   private cachedStatus: { at: number; status: ProviderStatus } | null = null;
+  private resolvedBin: string | null = null;
 
   constructor(private readonly options: CodexCliOptions = {}) {}
 
-  private get bin(): string {
-    return this.options.bin || "codex";
+  /** The Codex CLI to run, found once and reused while it keeps working. */
+  private async bin(): Promise<string | null> {
+    if (!this.resolvedBin) this.resolvedBin = await locateCodex(this.options.bin || undefined);
+    return this.resolvedBin;
   }
 
   async status(): Promise<ProviderStatus> {
@@ -79,13 +83,16 @@ export class CodexCliProvider implements AIProvider {
       status = { ...base, available: false, detail: "Отключено на сервере (CHATGPT_SUBSCRIPTION_ENABLED=false)" };
     } else {
       try {
-        const res = await run(this.bin, ["login", "status"], null, tmpdir(), 10_000);
+        const bin = await this.bin();
+        if (!bin) throw new Error("not found");
+        const res = await run(bin, ["login", "status"], null, tmpdir(), 10_000);
         const out = `${res.stdout}${res.stderr}`.trim();
-        if (res.code === 0 && /chatgpt/i.test(out)) status = { ...base, available: true, detail: "Codex CLI: вход через ChatGPT выполнен, тратится лимит подписки" };
+        if (res.code === 0 && /chatgpt/i.test(out)) status = { ...base, available: true, detail: `Codex CLI: вход через ChatGPT выполнен, тратится лимит подписки (${bin})` };
         else if (res.code === 0) status = { ...base, available: false, detail: "Codex CLI вошёл по API-ключу, а не через подписку ChatGPT. Выполните `codex login` и выберите «Sign in with ChatGPT»." };
         else status = { ...base, available: false, detail: "Codex CLI установлен, но вход не выполнен. Выполните `codex login` → «Sign in with ChatGPT»." };
       } catch {
-        status = { ...base, available: false, detail: "Codex CLI не найден. Установите: npm i -g @openai/codex, затем `codex login`." };
+        this.resolvedBin = null;
+        status = { ...base, available: false, detail: "Codex CLI не найден: ни приложение Codex, ни npm-пакет @openai/codex не дают командную строку. Установите: npm i -g @openai/codex (вход через ChatGPT подхватится)." };
       }
     }
     this.cachedStatus = { at: Date.now(), status };
@@ -94,7 +101,8 @@ export class CodexCliProvider implements AIProvider {
 
   async generateText(request: TextRequest): Promise<TextResult> {
     const status = await this.status();
-    if (!status.available) throw new AIError("not_configured", status.detail, this.id);
+    const bin = await this.bin();
+    if (!status.available || !bin) throw new AIError("not_configured", status.detail, this.id);
     const dir = await mkdtemp(path.join(tmpdir(), "aetherfall-codex-"));
     const outFile = path.join(dir, "answer.txt");
     const prompt = [
@@ -108,7 +116,7 @@ export class CodexCliProvider implements AIProvider {
     if (this.options.model) args.push("-m", this.options.model);
     args.push("-");
     try {
-      const res = await run(this.bin, args, prompt, dir, this.options.timeoutMs ?? 240_000, request.signal);
+      const res = await run(bin, args, prompt, dir, this.options.timeoutMs ?? 240_000, request.signal);
       if (res.code !== 0) throw classify(res.stderr || res.stdout);
       const text = (await readFile(outFile, "utf8").catch(() => res.stdout)).trim();
       if (!text) throw new AIError("invalid_output", "Codex CLI вернул пустой ответ", this.id);
