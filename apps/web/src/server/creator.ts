@@ -1,0 +1,94 @@
+import { z } from "zod";
+import {
+  FIELD_ACTION_LABELS,
+  ScenarioPatchSchema,
+  ScenarioSchema,
+  analyzeIdea,
+  applyPatch,
+  assistField,
+  editorAssistant,
+  generateCharacters,
+  generateScenarioDraft,
+  proposeAlternatives,
+  proposeRevision,
+  reviewScenario,
+  validateScenario,
+  type FieldAction,
+  type TextGenerator,
+} from "@aetherfall/core/server";
+import { ApiError } from "./http";
+import { newScenarioId } from "./scenarios";
+
+/**
+ * Scenario creator operations. Every AI result is a proposal: drafts and
+ * patches are returned to the UI and only saved when the author confirms.
+ */
+
+const FieldActionSchema = z.enum(Object.keys(FIELD_ACTION_LABELS) as [FieldAction, ...FieldAction[]]);
+
+export const CreatorRequestSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("analyze"), idea: z.string().trim().min(10, "Опишите идею хотя бы одним предложением").max(6000) }),
+  z.object({
+    op: z.literal("draft"),
+    idea: z.string().trim().min(10).max(6000),
+    answers: z.array(z.object({ questionId: z.string(), question: z.string(), answer: z.string() })).max(30),
+    authorName: z.string().trim().min(1).max(80),
+  }),
+  z.object({ op: z.literal("revise"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(3000) }),
+  z.object({ op: z.literal("alternatives"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(3000) }),
+  z.object({ op: z.literal("apply_patch"), scenario: z.unknown(), patch: z.unknown() }),
+  z.object({
+    op: z.literal("field"),
+    scenario: z.unknown(),
+    fieldLabel: z.string().min(1).max(200),
+    value: z.string().max(20000),
+    action: FieldActionSchema,
+    wish: z.string().max(2000).optional(),
+  }),
+  z.object({
+    op: z.literal("assistant"),
+    scenario: z.unknown(),
+    message: z.string().trim().min(1).max(4000),
+    history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) })).max(20).default([]),
+  }),
+  z.object({ op: z.literal("review"), scenario: z.unknown() }),
+  z.object({ op: z.literal("validate"), scenario: z.unknown() }),
+  z.object({ op: z.literal("characters"), scenario: z.unknown(), request: z.string().max(2000).default("") }),
+]);
+export type CreatorRequest = z.input<typeof CreatorRequestSchema>;
+
+export async function runCreator(ai: TextGenerator, raw: unknown): Promise<unknown> {
+  const req = CreatorRequestSchema.parse(raw);
+  const scenarioOf = (value: unknown) => {
+    const parsed = ScenarioSchema.safeParse(value);
+    if (!parsed.success) throw new ApiError(400, "Сценарий повреждён", parsed.error.issues.slice(0, 10).map((i) => `${i.path.join(".")}: ${i.message}`));
+    return parsed.data;
+  };
+  switch (req.op) {
+    case "analyze":
+      return analyzeIdea(ai, req.idea);
+    case "draft": {
+      const scenario = await generateScenarioDraft(ai, { idea: req.idea, answers: req.answers, id: newScenarioId("draft"), authorName: req.authorName });
+      return { scenario, validation: validateScenario(scenario) };
+    }
+    case "revise":
+      return { patch: await proposeRevision(ai, scenarioOf(req.scenario), req.instruction) };
+    case "alternatives":
+      return { patches: await proposeAlternatives(ai, scenarioOf(req.scenario), req.instruction) };
+    case "apply_patch": {
+      const result = applyPatch(scenarioOf(req.scenario), ScenarioPatchSchema.parse(req.patch));
+      if (!result.ok) throw new ApiError(422, "Изменение нельзя применить", result.errors);
+      return { scenario: result.scenario, validation: validateScenario(result.scenario) };
+    }
+    case "field":
+      return assistField(ai, { scenario: scenarioOf(req.scenario), fieldLabel: req.fieldLabel, value: req.value, action: req.action, wish: req.wish });
+    case "assistant":
+      return editorAssistant(ai, { scenario: scenarioOf(req.scenario), history: req.history, message: req.message });
+    case "review":
+      return reviewScenario(ai, scenarioOf(req.scenario));
+    case "validate":
+      return validateScenario(scenarioOf(req.scenario));
+    case "characters":
+      return generateCharacters(ai, { scenario: scenarioOf(req.scenario), request: req.request });
+  }
+}

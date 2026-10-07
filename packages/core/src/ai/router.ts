@@ -18,6 +18,8 @@ export interface RouterEvent {
   error?: string;
   code?: string;
   ms: number;
+  /** Unix ms when the call finished. */
+  at: number;
 }
 
 /**
@@ -76,7 +78,8 @@ export class AIRouter {
     throw lastError ?? new AIError("unknown", "AI недоступен");
   }
 
-  private record(event: RouterEvent): void {
+  private record(partial: Omit<RouterEvent, "at">): void {
+    const event = { ...partial, at: Date.now() };
     this.events.push(event);
     if (this.events.length > 100) this.events.shift();
     this.onEvent?.(event);

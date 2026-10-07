@@ -13,6 +13,7 @@ export { xpToNextLevel } from "./engine/progression";
 export { effectiveStats, findItem } from "./engine/mutations";
 export { abilityBlocker, findAbility } from "./engine/actions";
 export { timelineView, type TimelineView } from "./engine/timeline";
+export { presentNpcIds } from "./engine/world";
 export { validateScenario, type ValidationIssue, type ValidationReport, type IssueLevel } from "./scenario/validator";
 export { compileRules } from "./scenario/rulesCompiler";
 export { CharacterInputSchema, validateCharacter, type CharacterInput } from "./scenario/createGame";
