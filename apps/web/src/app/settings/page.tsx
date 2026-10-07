@@ -106,8 +106,14 @@ export default function SettingsPage() {
         <details className="mt-6 rounded-xl border border-white/[0.06] p-4 text-sm">
           <summary className="cursor-pointer font-medium">Как подключить AI</summary>
           <div className="mt-3 space-y-3 text-mist">
+            {status.data?.desktopConfigFile ? (
+              <p>
+                <b className="text-parchment">Где ключи.</b> Откройте файл <code className="break-all">{status.data.desktopConfigFile}</code> в Блокноте, впишите ключи и перезапустите Aetherfall. Файл хранится только на этом компьютере.
+              </p>
+            ) : null}
             <p>
-              <b className="text-parchment">Claude API.</b> В файле <code>apps/web/.env.local</code> задайте <code>ANTHROPIC_API_KEY</code> и перезапустите приложение. Ключ читается только сервером.
+              <b className="text-parchment">Claude API.</b> Задайте <code>ANTHROPIC_API_KEY</code>
+              {status.data?.desktopConfigFile ? " в этом файле" : <> в файле <code>apps/web/.env.local</code></>} и перезапустите приложение. Ключ читается только сервером.
             </p>
             <p>
               <b className="text-parchment">OpenAI API.</b> Аналогично: <code>OPENAI_API_KEY</code>. Этот же ключ используется для иллюстраций.

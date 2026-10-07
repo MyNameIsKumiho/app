@@ -4,7 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "**/.next/**", "**/dist/**", "apps/web/next-env.d.ts", "**/*.config.*"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "**/dist/**", "apps/web/next-env.d.ts", "**/*.config.*", "apps/desktop/src-tauri/**", "apps/desktop/loading/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -20,4 +20,5 @@ export default tseslint.config(
     plugins: { "react-hooks": reactHooks },
     rules: reactHooks.configs.recommended.rules,
   },
+  { files: ["apps/desktop/scripts/**"], rules: { "no-console": "off" } },
 );

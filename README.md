@@ -42,4 +42,17 @@ Production-сборка: `pnpm build && pnpm start`. Проверки: `pnpm che
 - `packages/core` — чистый TypeScript: Zod-схемы сценария и состояния, игровой движок, Context Engine, память, AI Router и провайдеры, создатель сценариев, формат `.scenario`, миграции, демо-сценарий.
 - `apps/web` — Next.js (App Router), React, Tailwind, TanStack Query, Drizzle + SQLite.
 
-Desktop-обёртка (Tauri) — следующий этап: core и сервер уже отделены от UI.
+## Desktop (Tauri)
+
+Desktop-версия запускает тот же сервер Next.js со встроенным Node.js на свободном порту `127.0.0.1` и показывает его в окне.
+
+Сборка (нужны Rust, а на Windows ещё MSVC Build Tools и WebView2):
+
+```bash
+pnpm install
+pnpm --filter @aetherfall/desktop build
+```
+
+Установщик появится в `apps/desktop/src-tauri/target/release/bundle/` (на Windows это `nsis/Aetherfall_*_x64-setup.exe`).
+
+Ключи хранятся в файле `aetherfall.env` в папке настроек приложения (на Windows `%APPDATA%\app.aetherfall.desktop\aetherfall.env`). Файл создаётся при первом запуске, и его путь показан в «Настройки → AI». Ключи читает только локальный сервер, в окно они не попадают. База и журнал сервера лежат в `%APPDATA%\app.aetherfall.desktop` (Windows), `~/.local/share/app.aetherfall.desktop` (Linux) или `~/Library/Application Support/app.aetherfall.desktop` (macOS).

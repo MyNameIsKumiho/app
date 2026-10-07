@@ -5,5 +5,6 @@ export interface AIStatusDTO {
   fallback: { id: string; label: string } | null;
   usingMock: boolean;
   image: { id: string; label: string; mock: boolean };
+  desktopConfigFile: string | null;
   recentEvents: { providerId: string; ok: boolean; error?: string; code?: string; ms: number; at: number }[];
 }

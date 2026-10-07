@@ -71,6 +71,8 @@ export interface AIStatus {
   usingMock: boolean;
   image: { id: string; label: string; mock: boolean };
   recentEvents: RouterEvent[];
+  /** Desktop build: the local file where the user puts API keys (path only). */
+  desktopConfigFile: string | null;
 }
 
 export async function describeAI(env: AIEnvironment, settings: AppSettings): Promise<AIStatus> {
@@ -86,5 +88,6 @@ export async function describeAI(env: AIEnvironment, settings: AppSettings): Pro
     usingMock: first?.kind === "mock",
     image: { id: image.id, label: image.label, mock: image.id === env.images.mock.id },
     recentEvents: env.events.slice(-10).reverse(),
+    desktopConfigFile: process.env.AETHERFALL_CONFIG_FILE ?? null,
   };
 }

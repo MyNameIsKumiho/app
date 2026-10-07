@@ -1,0 +1,16 @@
+{
+  "name": "@aetherfall/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-server": "node scripts/prepare-server.mjs",
+    "fetch-node": "node scripts/fetch-node.mjs",
+    "icons": "tauri icon icons/app-icon.svg",
+    "build": "node scripts/prepare-server.mjs && node scripts/fetch-node.mjs && tauri build",
+    "dev": "node scripts/prepare-server.mjs && node scripts/fetch-node.mjs && tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Aetherfall</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #07080d; color: #ece6d8; font-family: Georgia, serif; }
+      body { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px;
+        background-image: radial-gradient(50rem 30rem at 20% 0%, rgba(91,107,224,.18), transparent 60%); }
+      .star { font-size: 42px; color: #8fa2ff; animation: pulse 1.6s ease-in-out infinite; }
+      p { margin: 0; color: #a8a5b6; font-family: system-ui, sans-serif; font-size: 14px; }
+      #error { display: none; max-width: 560px; color: #e07a8f; white-space: pre-wrap; text-align: center; }
+      @keyframes pulse { 50% { opacity: .35; transform: scale(.9); } }
+    </style>
+  </head>
+  <body>
+    <div class="star">✦</div>
+    <h1 style="margin:0;font-weight:400;letter-spacing:.05em">Aetherfall</h1>
+    <p id="status">Открываем мир…</p>
+    <p id="error"></p>
+  </body>
+</html>
