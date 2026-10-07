@@ -50,6 +50,19 @@ fn parse_env_file(path: &Path) -> HashMap<String, String> {
     vars
 }
 
+/// Windows resolves bundle paths to the verbatim form `\\?\C:\...`, which
+/// Node.js cannot start a script from. Turn it back into a plain path.
+fn plain_path(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest);
+    }
+    path
+}
+
 fn free_port() -> std::io::Result<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
 }
@@ -77,9 +90,9 @@ fn server_path(exe_dir: &Path) -> String {
 }
 
 fn start_server(app: &tauri::AppHandle, port: u16) -> Result<(Child, PathBuf), String> {
-    let exe_dir = std::env::current_exe().map_err(|e| e.to_string())?.parent().map(Path::to_path_buf).ok_or("no exe dir")?;
+    let exe_dir = plain_path(std::env::current_exe().map_err(|e| e.to_string())?.parent().map(Path::to_path_buf).ok_or("no exe dir")?);
     let node = exe_dir.join(if cfg!(windows) { "node.exe" } else { "node" });
-    let server_root = app.path().resource_dir().map_err(|e| e.to_string())?.join("server");
+    let server_root = plain_path(app.path().resource_dir().map_err(|e| e.to_string())?).join("server");
     let server_dir = server_root.join("apps").join("web");
     let server_js = server_dir.join("server.js");
     if !node.exists() {
@@ -89,8 +102,8 @@ fn start_server(app: &tauri::AppHandle, port: u16) -> Result<(Child, PathBuf), S
         return Err(format!("Не найден сервер приложения: {}", server_js.display()));
     }
 
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let data_dir = plain_path(app.path().app_data_dir().map_err(|e| e.to_string())?);
+    let config_dir = plain_path(app.path().app_config_dir().map_err(|e| e.to_string())?);
     fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     let config_file = config_dir.join("aetherfall.env");

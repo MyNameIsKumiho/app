@@ -53,6 +53,8 @@ pnpm install
 pnpm --filter @aetherfall/desktop build
 ```
 
+На Windows собирайте из короткого пути, например `C:\aetherfall`: NSIS не справляется с путями длиннее 260 символов.
+
 Установщик появится в `apps/desktop/src-tauri/target/release/bundle/` (на Windows это `nsis/Aetherfall_*_x64-setup.exe`).
 
 Ключи хранятся в файле `aetherfall.env` в папке настроек приложения (на Windows `%APPDATA%\app.aetherfall.desktop\aetherfall.env`). Файл создаётся при первом запуске, и его путь показан в «Настройки → AI». Ключи читает только локальный сервер, в окно они не попадают. База и журнал сервера лежат в `%APPDATA%\app.aetherfall.desktop` (Windows), `~/.local/share/app.aetherfall.desktop` (Linux) или `~/Library/Application Support/app.aetherfall.desktop` (macOS).
