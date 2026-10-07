@@ -1,3 +1,4 @@
+import { AIError } from "../ai/types";
 import { IdSchema, slugify, uniqueId } from "../domain/common";
 import { ScenarioSchema, type Scenario } from "../domain/scenario";
 
@@ -6,6 +7,35 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
+
+/** Models write `null` for "not applicable" (e.g. no fandom); the schema expects the field to be absent. */
+function dropNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return value.filter((v) => v !== null).map(dropNulls);
+  if (!isObj(value)) return value;
+  const out: Obj = {};
+  for (const [k, v] of Object.entries(value)) if (v !== null) out[k] = dropNulls(v);
+  return out;
+}
+
+/** Removes the value at `path` (an entry of an array or a key of an object). Returns false if it cannot. */
+function removeAt(root: Obj, path: PropertyKey[]): boolean {
+  if (path.length < 2) return false;
+  let parent: unknown = root;
+  for (const key of path.slice(0, -1)) {
+    parent = (parent as Record<PropertyKey, unknown> | undefined)?.[key];
+    if (parent === undefined || parent === null) return false;
+  }
+  const last = path[path.length - 1];
+  if (Array.isArray(parent) && typeof last === "number") {
+    parent.splice(last, 1);
+    return true;
+  }
+  if (isObj(parent) && typeof last === "string" && last in parent) {
+    delete parent[last];
+    return true;
+  }
+  return false;
+}
 
 const COLLECTIONS = ["locations", "npcs", "factions", "abilities", "items", "lore", "quests", "timeline"] as const;
 const CONDITION_TYPES = new Set(["flag", "npc_alive", "quest_status", "player_at", "relationship_at_least"]);
@@ -53,7 +83,8 @@ function normalizeCollection(raw: unknown): Obj[] {
  * fixes ids, resolves name references, drops broken entries, fills defaults.
  */
 export function sanitizeScenario(raw: unknown, id: string, authorName?: string): Scenario {
-  const input: Obj = isObj(raw) ? structuredClone(raw) : {};
+  const cleaned = dropNulls(raw);
+  const input: Obj = isObj(cleaned) ? cleaned : {};
   for (const key of COLLECTIONS) input[key] = normalizeCollection(input[key]);
   const col = (key: (typeof COLLECTIONS)[number]) => input[key] as Obj[];
 
@@ -134,8 +165,8 @@ export function sanitizeScenario(raw: unknown, id: string, authorName?: string):
   input.id = id;
   delete input.formatVersion;
 
-  // Last resort: drop individual collection entries that still fail validation.
-  for (let attempt = 0; attempt < 30; attempt++) {
+  // Last resort: drop the individual entries or optional fields that still fail validation.
+  for (let attempt = 0; attempt < 60; attempt++) {
     const parsed = ScenarioSchema.safeParse(input);
     if (parsed.success) return parsed.data;
     const issue = parsed.error.issues[0];
@@ -148,7 +179,9 @@ export function sanitizeScenario(raw: unknown, id: string, authorName?: string):
       delete input[root];
       continue;
     }
-    throw new Error(`Не удалось собрать сценарий: ${issue?.path.join(".")}: ${issue?.message}`);
+    // A broken optional field inside metadata or start (fandom, a date part…): drop it and let defaults apply.
+    if (issue && root !== "id" && issue.path.join(".") !== "metadata.title" && removeAt(input, issue.path)) continue;
+    throw new AIError("invalid_output", `Не удалось собрать сценарий: поле ${issue?.path.join(".")}: ${issue?.message}`);
   }
   return ScenarioSchema.parse(input);
 }

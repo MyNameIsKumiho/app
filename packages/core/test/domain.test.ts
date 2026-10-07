@@ -24,3 +24,24 @@ describe("domain", () => {
     expect(uniqueId("Огненный шар", ["ognennyy-shar"])).toBe("ognennyy-shar-2");
   });
 });
+
+describe("sanitizeScenario with sloppy model output", () => {
+  it("treats nulls as missing fields instead of failing", async () => {
+    const { sanitizeScenario } = await import("../src/creator/sanitize");
+    const scenario = sanitizeScenario(
+      {
+        metadata: { title: "Тест", fandom: null, origin: "original" },
+        world: { name: "Мир", description: "Описание", magicSystem: null },
+        locations: [{ id: "hall", name: "Зал", description: "Большой зал", connections: null }, null],
+        npcs: [{ id: "mentor", name: "Наставник", description: "Строгий", secrets: null, startingLocationId: "hall" }],
+        start: { locationId: "hall", situation: "Начало", openingScene: "Сцена", date: { year: 1, month: 1, day: 1, hour: null } },
+      },
+      "test-draft",
+      "Автор",
+    );
+    expect(scenario.metadata.title).toBe("Тест");
+    expect(scenario.metadata.fandom ?? "").toBe("");
+    expect(scenario.locations).toHaveLength(1);
+    expect(scenario.npcs[0]?.name).toBe("Наставник");
+  });
+});
