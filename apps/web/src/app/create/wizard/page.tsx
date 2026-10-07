@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import type { Scenario, ScenarioPatch, ValidationReport } from "@aetherfall/core";
+import { DRAFT_STAGES, DRAFT_STAGE_LABELS, type DraftStage, type Scenario, type ScenarioPatch, type ValidationReport } from "@aetherfall/core";
 import { AIBanner } from "@/components/AIBanner";
 import { PatchPreview } from "@/components/editor/PatchPreview";
 import { ValidationList } from "@/components/editor/ValidationList";
@@ -28,6 +28,9 @@ interface WizardState {
   answers: Record<string, string>;
   draft: Scenario | null;
   validation: ValidationReport | null;
+  /** Draft steps already built, kept so a failed step can be retried without redoing the others. */
+  partial: Record<string, unknown>;
+  stagesDone: DraftStage[];
 }
 
 const STORAGE_KEY = "aetherfall.wizard";
@@ -36,7 +39,7 @@ const EXAMPLES = [
   "Детектив-нуар в городе, где каждую ночь кто-то просыпается с чужими воспоминаниями",
   "Космическая станция на краю галактики, экипаж которой медленно забывает, зачем сюда прилетел",
 ];
-const EMPTY: WizardState = { idea: "", analysis: null, answers: {}, draft: null, validation: null };
+const EMPTY: WizardState = { idea: "", analysis: null, answers: {}, draft: null, validation: null, partial: {}, stagesDone: [] };
 
 function loadState(): WizardState {
   try {
@@ -72,20 +75,31 @@ export default function WizardPage() {
 
   const analyze = useMutation({
     mutationFn: () => api<Analysis>("/api/creator", { body: { op: "analyze", idea: state.idea } }),
-    onSuccess: (analysis) => setState((s) => ({ ...s, analysis, answers: {}, draft: null, validation: null })),
+    onSuccess: (analysis) => setState((s) => ({ ...s, analysis, answers: {}, draft: null, validation: null, partial: {}, stagesDone: [] })),
   });
+  const [buildingStage, setBuildingStage] = useState<DraftStage | null>(null);
   const draft = useMutation({
-    mutationFn: () =>
-      api<{ scenario: Scenario; validation: ValidationReport }>("/api/creator", {
-        body: {
-          op: "draft",
-          idea: state.idea,
-          authorName: settings.data?.profile.authorName ?? "Игрок",
-          answers: (state.analysis?.questions ?? []).map((q) => ({ questionId: q.id, question: q.question, answer: state.answers[q.id] || "На усмотрение AI" })),
-        },
-      }),
-    onSuccess: (res) => setState((s) => ({ ...s, draft: res.scenario, validation: res.validation })),
+    mutationFn: async () => {
+      const answers = (state.analysis?.questions ?? []).map((q) => ({ questionId: q.id, question: q.question, answer: state.answers[q.id] || "На усмотрение AI" }));
+      let partial = state.partial;
+      const done = [...state.stagesDone];
+      for (const stage of DRAFT_STAGES) {
+        if (done.includes(stage)) continue;
+        setBuildingStage(stage);
+        const res = await api<{ partial: Record<string, unknown>; scenario?: Scenario; validation?: ValidationReport }>("/api/creator", {
+          body: { op: "draft", stage, partial, idea: state.idea, authorName: settings.data?.profile.authorName ?? "Игрок", answers },
+        });
+        partial = res.partial;
+        done.push(stage);
+        setState((s) => ({ ...s, partial: res.partial, stagesDone: [...done] }));
+        if (res.scenario && res.validation) return { scenario: res.scenario, validation: res.validation };
+      }
+      throw new Error("Черновик не собрался: повторите попытку");
+    },
+    onSuccess: (res) => setState((s) => ({ ...s, draft: res.scenario, validation: res.validation, partial: {}, stagesDone: [] })),
+    onSettled: () => setBuildingStage(null),
   });
+  const elapsed = useElapsed(draft.isPending);
   const revise = useMutation({
     mutationFn: (kind: "revise" | "alternatives") => api<{ patch?: ScenarioPatch; patches?: ScenarioPatch[] }>("/api/creator", { body: { op: kind, scenario: state.draft, instruction } }),
     onSuccess: (res) => setPending(res.patches ?? (res.patch ? [res.patch] : [])),
@@ -164,7 +178,7 @@ export default function WizardPage() {
           {state.analysis.questions.map((q) => {
             const answer = state.answers[q.id] ?? "";
             const isCustom = answer !== "" && !q.options.some((o) => o.label === answer);
-            const setAnswer = (v: string) => setState((s) => ({ ...s, answers: { ...s.answers, [q.id]: v } }));
+            const setAnswer = (v: string) => setState((s) => ({ ...s, answers: { ...s.answers, [q.id]: v }, partial: {}, stagesDone: [] }));
             return (
               <fieldset key={q.id}>
                 <legend className="font-serif text-lg">{q.question}</legend>
@@ -186,8 +200,10 @@ export default function WizardPage() {
             <button className="btn-primary px-6 py-3" disabled={draft.isPending} onClick={() => draft.mutate()}>
               {draft.isPending ? (
                 <>
-                  <Spinner /> Строю мир… это может занять минуту
+                  <Spinner /> Строю мир… {formatElapsed(elapsed)}
                 </>
+              ) : state.stagesDone.length ? (
+                "Продолжить сборку"
               ) : (
                 "Собрать черновик"
               )}
@@ -196,7 +212,21 @@ export default function WizardPage() {
               ← Изменить идею
             </button>
           </div>
-          <p className="text-xs text-fog">Вопросы без ответа AI решит сам, и вы сможете всё поменять в черновике.</p>
+          {(draft.isPending || state.stagesDone.length > 0) && (
+            <ol className="space-y-1 text-sm">
+              {DRAFT_STAGES.map((stage, i) => {
+                const done = state.stagesDone.includes(stage);
+                const active = buildingStage === stage;
+                return (
+                  <li key={stage} className={cx("flex items-center gap-2", done ? "text-jade" : active ? "text-parchment" : "text-fog")}>
+                    {active ? <Spinner className="size-3" /> : <span className="w-3 text-center">{done ? "✓" : "·"}</span>}
+                    Шаг {i + 1} из {DRAFT_STAGES.length}: {DRAFT_STAGE_LABELS[stage]}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          <p className="text-xs text-fog">Вопросы без ответа AI решит сам, и вы сможете всё поменять в черновике. Через подписку ChatGPT каждый шаг занимает до пары минут.</p>
         </section>
       )}
 
@@ -311,4 +341,26 @@ function DraftPreview({ scenario: s }: { scenario: Scenario }) {
       {block("Лор", s.lore.map((l) => ({ name: l.name, text: l.description })))}
     </article>
   );
+}
+
+/** Seconds since `running` became true; 0 while idle. */
+function useElapsed(running: boolean): number {
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const start = Date.now();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the timer starts when the request starts
+    setStartedAt(start);
+    setNow(start);
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
+  return running && startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+}
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m ? `${m} мин ${String(s).padStart(2, "0")} с` : `${s} с`;
 }

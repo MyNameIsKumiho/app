@@ -27,14 +27,22 @@ interface RunResult {
   code: number | null;
   stdout: string;
   stderr: string;
+  timedOut: boolean;
 }
+
+/** One draft step is a few thousand tokens of JSON; give it room, but do not hang forever. */
+const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
 function run(bin: string, args: string[], input: string | null, cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { cwd, stdio: ["pipe", "pipe", "pipe"], env: process.env });
     let stdout = "";
     let stderr = "";
-    const timer = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+    }, timeoutMs);
     const onAbort = () => child.kill("SIGTERM");
     signal?.addEventListener("abort", onAbort, { once: true });
     child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
@@ -46,18 +54,30 @@ function run(bin: string, args: string[], input: string | null, cwd: string, tim
     child.on("close", (code) => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
-      resolve({ code, stdout, stderr });
+      resolve({ code, stdout, stderr, timedOut });
     });
     child.stdin.end(input ?? "");
   });
 }
 
-function classify(stderr: string): AIError {
-  const text = redactSecrets(stderr.slice(-800));
+/**
+ * Codex echoes the whole prompt into its log, so the raw output is useless as
+ * an error message. Keep only lines that look like an actual problem.
+ */
+function errorLines(output: string): string {
+  const lines = output
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => /error|failed|denied|limit|quota|unauthori|login|429|401|403|5\d\d\b/i.test(l) && l.length < 400);
+  return lines.slice(-3).join(" · ");
+}
+
+function classify(output: string): AIError {
+  const text = redactSecrets(errorLines(output));
   if (/usage limit|limit reached|quota/i.test(text)) return new AIError("quota", "Лимит подписки ChatGPT исчерпан", "chatgpt");
   if (/rate.?limit|429/i.test(text)) return new AIError("rate_limit", "ChatGPT: слишком много запросов", "chatgpt");
   if (/not logged in|login|401|unauthori/i.test(text)) return new AIError("auth", "Codex CLI: нужно войти через «Sign in with ChatGPT»", "chatgpt");
-  return new AIError("unavailable", `Codex CLI завершился с ошибкой: ${text || "нет вывода"}`, "chatgpt");
+  return new AIError("unavailable", `Codex CLI завершился с ошибкой${text ? `: ${text}` : " без описания причины"}`, "chatgpt");
 }
 
 export class CodexCliProvider implements AIProvider {
@@ -112,12 +132,15 @@ export class CodexCliProvider implements AIProvider {
       ...request.messages.map((m) => `## ${m.role === "user" ? "Запрос" : "Твой предыдущий ответ"}\n${m.content}`),
       request.json ? "Ответь только JSON-объектом." : "",
     ].join("\n\n");
-    const args = ["exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "--color", "never", "--ignore-rules", "-o", outFile];
+    // The user's own MCP servers are not needed to write text, and each one would start a process per request.
+    const args = ["exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "--color", "never", "--ignore-rules", "-c", "mcp_servers={}", "-o", outFile];
     if (this.options.model) args.push("-m", this.options.model);
     args.push("-");
     try {
-      const res = await run(bin, args, prompt, dir, this.options.timeoutMs ?? 240_000, request.signal);
-      if (res.code !== 0) throw classify(res.stderr || res.stdout);
+      const timeoutMs = this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const res = await run(bin, args, prompt, dir, timeoutMs, request.signal);
+      if (res.timedOut) throw new AIError("timeout", `ChatGPT (Codex) не ответил за ${Math.round(timeoutMs / 60_000)} мин`, this.id);
+      if (res.code !== 0) throw classify(`${res.stderr}\n${res.stdout}`);
       const text = (await readFile(outFile, "utf8").catch(() => res.stdout)).trim();
       if (!text) throw new AIError("invalid_output", "Codex CLI вернул пустой ответ", this.id);
       return { text, providerId: this.id, model: this.options.model ?? "codex-default" };

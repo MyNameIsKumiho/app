@@ -9,7 +9,9 @@ import {
   assistField,
   editorAssistant,
   generateCharacters,
-  generateScenarioDraft,
+  DRAFT_STAGES,
+  finishScenarioDraft,
+  generateDraftStage,
   proposeAlternatives,
   proposeRevision,
   reviewScenario,
@@ -35,6 +37,9 @@ export const CreatorRequestSchema = z.discriminatedUnion("op", [
     idea: z.string().trim().min(10).max(MAX_USER_TEXT),
     answers: z.array(z.object({ questionId: z.string(), question: z.string(), answer: z.string() })).max(30),
     authorName: z.string().trim().min(1).max(80),
+    /** One step of the draft; without it all steps run in this request. */
+    stage: z.enum(DRAFT_STAGES).optional(),
+    partial: z.record(z.string(), z.unknown()).default({}),
   }),
   z.object({ op: z.literal("revise"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(MAX_USER_TEXT) }),
   z.object({ op: z.literal("alternatives"), scenario: z.unknown(), instruction: z.string().trim().min(3).max(MAX_USER_TEXT) }),
@@ -71,8 +76,13 @@ export async function runCreator(ai: TextGenerator, raw: unknown, loadScenario: 
     case "analyze":
       return analyzeIdea(ai, req.idea);
     case "draft": {
-      const scenario = await generateScenarioDraft(ai, { idea: req.idea, answers: req.answers, id: newScenarioId("draft"), authorName: req.authorName });
-      return { scenario, validation: validateScenario(scenario) };
+      const stages = req.stage ? [req.stage] : DRAFT_STAGES;
+      let partial = req.partial;
+      for (const stage of stages) partial = await generateDraftStage(ai, { idea: req.idea, answers: req.answers, stage, partial });
+      const last = stages[stages.length - 1] === DRAFT_STAGES[DRAFT_STAGES.length - 1];
+      if (!last) return { partial };
+      const scenario = finishScenarioDraft(partial, newScenarioId("draft"), req.authorName);
+      return { partial, scenario, validation: validateScenario(scenario) };
     }
     case "revise":
       return { patch: await proposeRevision(ai, scenarioOf(req.scenario), req.instruction) };

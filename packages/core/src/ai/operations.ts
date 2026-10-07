@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DRAFT_STAGES, type DraftStage } from "../creator/draftStages";
 import type { ActionPart } from "../domain/actions";
 import type { GameState } from "../domain/gameState";
 import type { Scenario } from "../domain/scenario";
@@ -222,9 +223,50 @@ const SCENARIO_FORMAT_HINT = `Формат сценария (JSON). Обязат
  "rules":{"tone","narrativeStyle","responseLength":"short|medium|long","violence":"none|low|medium|high","romance":"none|low|medium|high","comedy":"none|low|medium|high","difficulty":"story|normal|hard|brutal","canonStrictness":"loose|balanced|strict","playerFreedom":"guided|open|sandbox","npcAutonomy":"none|low|medium|high","worldLethality":"none|low|medium|high","playerCanDie":false,"progressionSpeed":"slow|normal|fast","customInstructions"},
  "storyHooks":[]}`;
 
-export async function generateScenarioDraft(ai: TextGenerator, input: { idea: string; answers: WizardAnswer[]; id: string; authorName: string }): Promise<Scenario> {
+/**
+ * A draft is built in three steps so that each model call stays small enough
+ * to finish quickly (one giant JSON answer can take many minutes) and the UI
+ * can show real progress. Every step sees what the previous ones produced.
+ */
+const DRAFT_STAGE_KEYS: Record<DraftStage, readonly string[]> = {
+  world: ["metadata", "tags", "world", "calendar", "mechanics", "system", "rules", "locations"],
+  cast: ["npcs", "factions", "abilities", "items", "characterCreation"],
+  story: ["lore", "quests", "timeline", "start", "storyHooks"],
+};
+
+const DRAFT_STAGE_TASKS: Record<DraftStage, string> = {
+  world:
+    "Шаг 1 из 3. Создай основу сценария: название и описание, теги, мир (история, география, магия или технологии, политика, культура, важные правила), календарь, механики и характеристики, систему (если уместна), правила для рассказчика и тон, 4–6 локаций со связями между ними.",
+  cast:
+    "Шаг 2 из 3. По уже созданному миру добавь 3–6 важных персонажей с характерами, целями, страхами и тайнами (startingLocationId — id из созданных локаций), 2–3 фракции, систему сил через способности (стартовые способности героя не должны делать его всемогущим), полезные предметы и настройки создания героя.",
+  story:
+    "Шаг 3 из 3. По уже созданному миру и персонажам добавь лор, 2–4 квеста, 3–5 событий временной линии, стартовую ситуацию героя с первой сценой (start, locationId — из созданных локаций, activeQuestIds — из квестов) и сюжетные зацепки.",
+};
+
+/** Lines of SCENARIO_FORMAT_HINT that describe the given keys. */
+function formatHintFor(keys: readonly string[]): string {
+  const lines = SCENARIO_FORMAT_HINT.split("\n").slice(1);
+  const picked = lines.filter((line) => keys.some((k) => line.trimStart().replace(/^\{/, "").startsWith(`"${k}"`)));
+  return `Формат (JSON), верни объект только с ключами ${keys.map((k) => `"${k}"`).join(", ")}:\n${picked.join("\n")}`;
+}
+
+export interface DraftStageInput {
+  idea: string;
+  answers: WizardAnswer[];
+  stage: DraftStage;
+  /** Everything produced by the previous steps. */
+  partial: Record<string, unknown>;
+}
+
+/** Runs one step of the draft and returns the partial scenario with this step's keys merged in. */
+export async function generateDraftStage(ai: TextGenerator, input: DraftStageInput): Promise<Record<string, unknown>> {
+  const keys = DRAFT_STAGE_KEYS[input.stage];
   const answers = input.answers.map((a) => `- ${a.question}: ${a.answer}`).join("\n");
-  const schema = z.unknown().transform((raw) => sanitizeScenario(raw, input.id, input.authorName));
+  const soFar = Object.keys(input.partial).length ? `\n\nУже создано (не повторяй, опирайся на эти id и имена):\n${JSON.stringify(input.partial)}` : "";
+  const schema = z
+    .unknown()
+    .refine((raw) => typeof raw === "object" && raw !== null && !Array.isArray(raw), "ожидался JSON-объект")
+    .transform((raw) => raw as Record<string, unknown>);
   const res = await generateStructured(
     ai,
     {
@@ -233,17 +275,30 @@ export async function generateScenarioDraft(ai: TextGenerator, input: { idea: st
       messages: [
         {
           role: "user",
-          content: `Идея: «${input.idea}»\nВыбор автора:\n${answers || "(без уточнений)"}\n\nСоздай полноценный черновик сценария: название, описание, теги, мир, стартовая ситуация, роль героя, система (если уместна), ключевые механики, тон, 3–6 важных персонажей с характерами и тайнами, 2–3 фракции, система сил, стартовые способности, 2–4 квеста, 3–5 событий временной линии, 4–6 локаций, сюжетные зацепки и правила для рассказчика. Герой должен быть интересным, но не всемогущим с первой минуты.\n\n${SCENARIO_FORMAT_HINT}\n\nОтветь ОДНИМ JSON-объектом сценария.`,
+          content: `Идея: «${input.idea}»\nВыбор автора:\n${answers || "(без уточнений)"}${soFar}\n\n${DRAFT_STAGE_TASKS[input.stage]} Герой должен быть интересным, но не всемогущим с первой минуты.\n\n${formatHintFor(keys)}\n\nОтветь ОДНИМ JSON-объектом.`,
         },
       ],
       temperature: 0.8,
-      maxOutputTokens: 16000,
+      maxOutputTokens: 8000,
       mockPayload: { idea: input.idea, answers: input.answers },
     },
     schema,
     2,
   );
-  return res.value;
+  const merged = { ...input.partial };
+  for (const key of keys) if (res.value[key] !== undefined) merged[key] = res.value[key];
+  return merged;
+}
+
+/** Turns the merged steps into a valid scenario. */
+export function finishScenarioDraft(partial: Record<string, unknown>, id: string, authorName: string): Scenario {
+  return sanitizeScenario(partial, id, authorName);
+}
+
+export async function generateScenarioDraft(ai: TextGenerator, input: { idea: string; answers: WizardAnswer[]; id: string; authorName: string }): Promise<Scenario> {
+  let partial: Record<string, unknown> = {};
+  for (const stage of DRAFT_STAGES) partial = await generateDraftStage(ai, { idea: input.idea, answers: input.answers, stage, partial });
+  return finishScenarioDraft(partial, input.id, input.authorName);
 }
 
 const PATCH_HINT = `Изменения описывай операциями:

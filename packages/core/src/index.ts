@@ -19,4 +19,5 @@ export { compileRules } from "./scenario/rulesCompiler";
 export { CharacterInputSchema, validateCharacter, type CharacterInput } from "./scenario/createGame";
 export { applyPatch, ScenarioPatchSchema, type ScenarioPatch, type PatchOperation } from "./creator/patch";
 export { FIELD_ACTION_LABELS, type FieldAction } from "./creator/fieldActions";
+export { DRAFT_STAGES, DRAFT_STAGE_LABELS, type DraftStage } from "./creator/draftStages";
 export type { IllustrationMode, ImageKind } from "./image/types";

@@ -125,4 +125,20 @@ describe("scenarios", () => {
     const res = (await runCreator(deps.ai, { op: "analyze", idea }, (id) => loadScenario(deps.db, id))) as object;
     expect(res).toBeTruthy();
   });
+
+  it("builds a draft step by step and returns the scenario after the last step", async () => {
+    const deps = setup();
+    const load = (id: string) => loadScenario(deps.db, id);
+    const base = { op: "draft", idea: "Академия магии на летающем острове", answers: [], authorName: "Автор" };
+    const world = (await runCreator(deps.ai, { ...base, stage: "world" }, load)) as { partial: Record<string, unknown>; scenario?: unknown };
+    expect(world.scenario).toBeUndefined();
+    expect(Object.keys(world.partial)).toContain("world");
+    expect(Object.keys(world.partial)).not.toContain("npcs");
+    const cast = (await runCreator(deps.ai, { ...base, stage: "cast", partial: world.partial }, load)) as { partial: Record<string, unknown> };
+    expect(Object.keys(cast.partial)).toEqual(expect.arrayContaining(["world", "npcs"]));
+    const story = (await runCreator(deps.ai, { ...base, stage: "story", partial: cast.partial }, load)) as { scenario: { npcs: unknown[]; start: { openingScene: string } } };
+    expect(story.scenario.npcs.length).toBeGreaterThan(0);
+    expect(story.scenario.start.openingScene.length).toBeGreaterThan(0);
+  });
 });
+
