@@ -228,13 +228,27 @@ function writeAutosave(db: DB, row: StoryRow, scenario: Scenario, state: GameSta
     .run();
 }
 
-export async function playStoryTurn(deps: StoryDeps, storyId: string, rawAction: unknown): Promise<PlayTurnResponse & { illustrate: boolean }> {
+/**
+ * Plays the player's action on top of the current head. With `replaceTurnId`
+ * the action replaces an earlier turn instead: the story is replayed from the
+ * moment before that turn with the edited action, and the old turn (with
+ * everything after it) stays behind as an abandoned branch.
+ */
+export async function playStoryTurn(deps: StoryDeps, storyId: string, rawAction: unknown, options: { replaceTurnId?: string } = {}): Promise<PlayTurnResponse & { illustrate: boolean }> {
   const action = PlayerActionSchema.parse(rawAction);
   return withStoryLock(storyId, async () => {
     const { db, settings } = deps;
     const row = getStoryRow(db, storyId);
     const scenario = loadSnapshot(db, row.snapshotId);
-    const state = parseState(row.state);
+    let parentId = row.headTurnId;
+    let state = parseState(row.state);
+    if (options.replaceTurnId) {
+      const replaced = getTurnRow(db, storyId, options.replaceTurnId);
+      if (!replaced.parentId || !replaced.action) throw new ApiError(400, "Начало истории нельзя изменить");
+      parentId = replaced.parentId;
+      state = parseState(getTurnRow(db, storyId, replaced.parentId).stateAfter);
+      state.journal.notes = parseState(row.state).journal.notes;
+    }
     if (!state.player.alive) throw new ApiError(409, "Герой погиб. Перемотайте историю назад или загрузите сохранение.");
 
     const played = await playTurn(deps.ai, scenario, state, action, { temperature: settings.ai.temperature, contextBudget: settings.ai.contextBudget });
@@ -253,7 +267,7 @@ export async function playStoryTurn(deps: StoryDeps, storyId: string, rawAction:
     const turnRow = {
       id: turnId,
       storyId,
-      parentId: row.headTurnId,
+      parentId,
       number: played.state.turn,
       action,
       actionSummary: played.actionSummary,

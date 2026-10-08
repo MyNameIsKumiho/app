@@ -1,6 +1,7 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
+import type { ActionPart } from "@aetherfall/core";
 import { PART_ICON, describePart } from "@/lib/actions";
 import type { PlayerView } from "@/lib/playerView";
 import type { TurnDTO } from "@/lib/types";
@@ -62,6 +63,49 @@ function Prose({ text, heroName }: { text: string; heroName: string }) {
   );
 }
 
+const TEXT_KINDS = new Set(["say", "do", "think", "free"]);
+const TEXT_LABELS: Record<string, string> = { say: "Сказать", do: "Действие", think: "Мысль", free: "Свободно" };
+
+/** Inline editor for the player's own action: text parts are editable, other parts can be removed. */
+function ActionEditor({ parts, view, isHead, busy, onCancel, onSave }: { parts: ActionPart[]; view: PlayerView; isHead: boolean; busy: boolean; onCancel: () => void; onSave: (parts: ActionPart[]) => void }) {
+  const [draft, setDraft] = useState<ActionPart[]>(parts);
+  const valid = draft.length > 0 && draft.every((p) => !("text" in p) || p.text.trim().length > 0);
+  return (
+    <div className="mb-3 space-y-2 rounded-xl border border-aether/30 bg-aether/[0.05] p-3">
+      {draft.map((p, i) =>
+        TEXT_KINDS.has(p.kind) && "text" in p ? (
+          <label key={i} className="block">
+            <span className="text-xs text-fog">
+              {PART_ICON[p.kind]} {TEXT_LABELS[p.kind]}
+            </span>
+            <textarea
+              className="input mt-1 min-h-20 w-full resize-y"
+              value={p.text}
+              onChange={(e) => setDraft((d) => d.map((x, j) => (j === i ? ({ ...x, text: e.target.value } as ActionPart) : x)))}
+            />
+          </label>
+        ) : (
+          <span key={i} className="mr-1.5 inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-sm">
+            {PART_ICON[p.kind]} {describePart(p, view)}
+            <button className="btn-quiet px-1 text-xs" onClick={() => setDraft((d) => d.filter((_, j) => j !== i))} aria-label="Убрать">
+              ✕
+            </button>
+          </span>
+        ),
+      )}
+      {!isHead && <p className="text-xs text-ember">Ходы после этого будут заменены новой версией (старые останутся в отменённой ветке).</p>}
+      <div className="flex justify-end gap-2">
+        <button className="btn-quiet text-sm" onClick={onCancel} disabled={busy}>
+          Отмена
+        </button>
+        <button className="btn-primary text-sm" disabled={!valid || busy} onClick={() => onSave(draft.map((p) => ("text" in p ? ({ ...p, text: p.text.trim() } as ActionPart) : p)))}>
+          {busy ? <Spinner className="size-4" /> : "Сохранить и переписать ответ"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Report({ turn, debug }: { turn: TurnDTO; debug: boolean }) {
   const r = turn.report;
   if (!r) return null;
@@ -105,6 +149,8 @@ export const TurnCard = memo(function TurnCard({
   onIllustrate,
   illustrating,
   canIllustrate,
+  onEdit,
+  editBusy,
 }: {
   turn: TurnDTO;
   view: PlayerView;
@@ -114,10 +160,23 @@ export const TurnCard = memo(function TurnCard({
   onIllustrate: (turn: TurnDTO) => void;
   illustrating: boolean;
   canIllustrate: boolean;
+  onEdit: (turn: TurnDTO, parts: ActionPart[]) => void;
+  editBusy: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
   return (
     <article className="group animate-fade-in">
-      {turn.action && (
+      {turn.action && editing && (
+        <ActionEditor
+          parts={turn.action.parts}
+          view={view}
+          isHead={isHead}
+          busy={editBusy}
+          onCancel={() => setEditing(false)}
+          onSave={(parts) => onEdit(turn, parts)}
+        />
+      )}
+      {turn.action && !editing && (
         <div className="mb-3 flex flex-wrap justify-end gap-1.5">
           {turn.action.parts.map((p, i) => (
             <span key={i} className="rounded-xl border border-aether/25 bg-aether/[0.08] px-3 py-1.5 text-sm text-parchment/90">
@@ -127,6 +186,9 @@ export const TurnCard = memo(function TurnCard({
               {describePart(p, view)}
             </span>
           ))}
+          <button className="btn-quiet px-2 text-xs opacity-60 hover:opacity-100" onClick={() => setEditing(true)} title="Изменить сообщение, и рассказчик перепишет ответ" aria-label="Изменить сообщение">
+            ✎
+          </button>
         </div>
       )}
       {turn.imageId && <img src={`/api/images/${turn.imageId}`} alt="Иллюстрация сцены" className="mb-4 w-full rounded-xl border border-white/10" loading="lazy" />}

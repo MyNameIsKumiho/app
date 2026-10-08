@@ -48,6 +48,20 @@ describe("stories", () => {
     expect(listSaves(deps.db, id).filter((s) => s.kind === "auto").length).toBeGreaterThan(0);
   });
 
+  it("editing an earlier message replays the story from that point", async () => {
+    const deps = setup();
+    const { id } = createStory(deps.db, { scenarioId: "aetherfall-academy", character: hero });
+    const t1 = await playStoryTurn(deps, id, { parts: [{ kind: "say", text: "Привет" }] });
+    await playStoryTurn(deps, id, { parts: [{ kind: "do", text: "Осматриваюсь" }] });
+    const edited = await playStoryTurn(deps, id, { parts: [{ kind: "say", text: "Здравствуйте, где церемония?" }] }, { replaceTurnId: t1.turn.id });
+    expect(edited.turn.number).toBe(1);
+    const detail = getStoryDetail(deps.db, id, deps.settings);
+    expect(detail.turns.map((t) => t.number)).toEqual([0, 1]);
+    expect(detail.turns[1]!.action?.parts[0]).toMatchObject({ text: "Здравствуйте, где церемония?" });
+    const opening = detail.turns[0]!;
+    await expect(playStoryTurn(deps, id, { parts: [{ kind: "say", text: "x" }] }, { replaceTurnId: opening.id })).rejects.toThrow(/нельзя/);
+  });
+
   it("never sends hidden data to the player view", async () => {
     const deps = setup();
     const { id } = createStory(deps.db, { scenarioId: "aetherfall-academy", character: hero });

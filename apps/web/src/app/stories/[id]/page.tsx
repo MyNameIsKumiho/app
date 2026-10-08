@@ -53,6 +53,16 @@ export default function StoryPage() {
     onError: (_error, action) => setStaged(action.parts),
   });
 
+  const editTurn = useMutation({
+    mutationFn: ({ turnId, parts }: { turnId: string; parts: ActionPart[] }) =>
+      api<PlayTurnResponse & { illustrate: boolean }>(`/api/stories/${id}/turn`, { body: { action: { parts }, replaceTurnId: turnId } }),
+    onSuccess: async (res) => {
+      await qc.invalidateQueries({ queryKey: key });
+      void qc.invalidateQueries({ queryKey: ["saves", id] });
+      if (res.illustrate) illustrate.mutate(res.turn.id);
+    },
+  });
+
   const rewind = useMutation({
     mutationFn: (turnId: string) => api(`/api/stories/${id}/rewind`, { body: { turnId } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
@@ -72,6 +82,7 @@ export default function StoryPage() {
     [rewind],
   );
   const onIllustrate = useCallback((turn: TurnDTO) => illustrate.mutate(turn.id), [illustrate]);
+  const onEdit = useCallback((turn: TurnDTO, parts: ActionPart[]) => editTurn.mutate({ turnId: turn.id, parts }), [editTurn]);
   const stage = useCallback((part: ActionPart) => {
     setStaged((prev) => (prev.length >= 7 ? prev : [...prev, part]));
     setPanelOpen(false);
@@ -135,7 +146,7 @@ export default function StoryPage() {
                 </p>
               )}
               {turns.map((t) => (
-                <TurnCard key={t.id} turn={t} view={view} isHead={t.id === head?.id} debug={debug} onRewind={onRewind} onIllustrate={onIllustrate} illustrating={illustrate.isPending && illustrate.variables === t.id} canIllustrate={canIllustrate} />
+                <TurnCard key={t.id} turn={t} view={view} isHead={t.id === head?.id} debug={debug} onRewind={onRewind} onIllustrate={onIllustrate} illustrating={illustrate.isPending && illustrate.variables === t.id} canIllustrate={canIllustrate} onEdit={onEdit} editBusy={editTurn.isPending && editTurn.variables?.turnId === t.id} />
               ))}
               {play.isPending && <PendingTurn parts={lastAction} view={view} />}
               {play.isError && (
@@ -143,6 +154,7 @@ export default function StoryPage() {
               )}
               {illustrate.isError && <ErrorState error={illustrate.error} title="Иллюстрация не получилась" />}
               {rewind.isError && <ErrorState error={rewind.error} />}
+              {editTurn.isError && <ErrorState error={editTurn.error} title="Не удалось переписать ответ" />}
               {!view.alive && (
                 <div className="rounded-xl border border-rose/30 bg-rose/[0.06] p-5 text-center">
                   <p className="font-serif text-xl text-rose">Ваш путь оборвался</p>
@@ -161,7 +173,7 @@ export default function StoryPage() {
             onStagedChange={setStaged}
             suggestions={head?.suggestions ?? []}
             showSuggestions={settings.data?.gameplay.showSuggestions ?? true}
-            busy={play.isPending || rewind.isPending}
+            busy={play.isPending || rewind.isPending || editTurn.isPending}
             disabled={!view.alive}
             onSubmit={(parts) => play.mutate({ parts })}
           />
