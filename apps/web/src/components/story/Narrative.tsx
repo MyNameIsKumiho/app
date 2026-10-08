@@ -6,25 +6,58 @@ import type { PlayerView } from "@/lib/playerView";
 import type { TurnDTO } from "@/lib/types";
 import { Spinner, cx } from "@/components/ui";
 
-/** Splits narrative into prose paragraphs and System windows ("[...]" lines). */
-function Prose({ text }: { text: string }) {
+/** A character line: "@Имя (роль): «текст»" (also tolerates "**Имя**: текст"). */
+const SPEAKER_LINE = /^(?:@\s*([^:()\n]{1,60}?)|\*\*([^*:()\n]{1,60}?)\*\*)\s*(?:\(([^)\n]{1,60})\))?\s*:\s*([\s\S]+)$/;
+
+function hueOf(name: string): number {
+  let h = 0;
+  for (const ch of name.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return h;
+}
+
+function SpeakerLine({ name, role, text, hero }: { name: string; role?: string; text: string; hero: boolean }) {
+  const hue = hueOf(name);
+  const color = hero ? "var(--color-aether)" : `hsl(${hue} 70% 72%)`;
+  return (
+    <div
+      className={cx("my-3 rounded-lg border-l-2 px-4 py-2 font-sans", hero && "ml-6")}
+      style={{ borderColor: color, background: hero ? "color-mix(in oklab, var(--color-aether) 7%, transparent)" : `hsl(${hue} 60% 50% / 0.07)` }}
+    >
+      <p className="mb-0.5 text-xs font-semibold tracking-wide" style={{ color }}>
+        {name}
+        {role && <span className="ml-1.5 font-normal opacity-70">· {role}</span>}
+      </p>
+      <p className="font-serif text-parchment">{text}</p>
+    </div>
+  );
+}
+
+/** Splits narrative into prose paragraphs, character lines and System windows ("[...]" lines). */
+function Prose({ text, heroName }: { text: string; heroName: string }) {
   const blocks = text
     .split(/\n+/)
     .map((b) => b.trim())
     .filter(Boolean);
   return (
     <div className="prose-story">
-      {blocks.map((block, i) =>
-        /^\[.*\]$/s.test(block) ? (
-          <div key={i} className="system-window">
-            {block.slice(1, -1)}
-          </div>
-        ) : (
+      {blocks.map((block, i) => {
+        if (/^\[.*\]$/s.test(block))
+          return (
+            <div key={i} className="system-window">
+              {block.slice(1, -1)}
+            </div>
+          );
+        const speaker = SPEAKER_LINE.exec(block);
+        if (speaker) {
+          const name = (speaker[1] ?? speaker[2] ?? "").trim();
+          return <SpeakerLine key={i} name={name} role={speaker[3]?.trim()} text={speaker[4]!.trim()} hero={name.toLowerCase() === heroName.toLowerCase()} />;
+        }
+        return (
           <p key={i} className={cx(block.startsWith("—") && "pl-1 text-parchment")}>
             {block}
           </p>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -97,7 +130,7 @@ export const TurnCard = memo(function TurnCard({
         </div>
       )}
       {turn.imageId && <img src={`/api/images/${turn.imageId}`} alt="Иллюстрация сцены" className="mb-4 w-full rounded-xl border border-white/10" loading="lazy" />}
-      <Prose text={turn.narrative} />
+      <Prose text={turn.narrative} heroName={view.player.name} />
       <Report turn={turn} debug={debug} />
       <div className="mt-2 flex gap-1 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
         {!isHead && (
