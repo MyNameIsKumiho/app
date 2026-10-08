@@ -78,14 +78,18 @@
 @utility chip {
   @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-xs text-mist;
 }
+/* Larger chip for the main controls under the story. */
+@utility chip-lg {
+  @apply gap-1.5 px-4 py-2 text-sm md:text-[0.95rem];
+}
 @utility chip-active {
   @apply border-aether/60 bg-aether/15 text-parchment;
 }
 @utility prose-story {
-  @apply font-serif text-[1.075rem] leading-[1.85] text-parchment/95;
+  @apply font-serif text-[1.125rem] leading-[1.8] text-parchment/95 xl:text-[1.2rem] 2xl:text-[1.25rem];
 }
 @utility system-window {
-  @apply my-3 rounded-lg border border-system/40 bg-system/[0.07] px-4 py-2 font-sans text-sm text-system shadow-[0_0_30px_-12px_var(--color-system)];
+  @apply my-3 rounded-lg border border-system/40 bg-system/[0.07] px-4 py-2 font-sans text-[0.95rem] text-system shadow-[0_0_30px_-12px_var(--color-system)];
 }
 @utility skeleton {
   @apply rounded-lg bg-ink-700;

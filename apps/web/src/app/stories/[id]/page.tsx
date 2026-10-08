@@ -139,7 +139,7 @@ export default function StoryPage() {
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-3xl space-y-10 px-4 py-8 sm:px-8">
+            <div className="mx-auto max-w-5xl space-y-10 px-4 py-8 sm:px-8 2xl:max-w-6xl">
               {meta.latestScenarioVersion && meta.latestScenarioVersion !== meta.scenarioVersion && (
                 <p className="rounded-lg border border-white/10 px-3 py-2 text-xs text-mist">
                   Эта история идёт на версии сценария {meta.scenarioVersion}. Автор выпустил {meta.latestScenarioVersion}: она будет использоваться в новых историях, а ваши сохранения не сломаются.

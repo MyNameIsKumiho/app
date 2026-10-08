@@ -74,10 +74,11 @@ export function Composer({ view, staged, onStagedChange, suggestions, showSugges
 
   return (
     <div className="border-t border-white/[0.06] bg-ink-950/85 px-3 pt-3 pb-4 backdrop-blur-md sm:px-6">
+      <div className="mx-auto max-w-5xl 2xl:max-w-6xl">
       {showSuggestions && suggestions.length > 0 && !busy && (
-        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1" aria-label="Подсказки">
+        <div className="mb-2 flex gap-2 overflow-x-auto pb-1" aria-label="Подсказки">
           {suggestions.map((s, i) => (
-            <button key={`${s.label}-${i}`} className="chip shrink-0 cursor-pointer whitespace-nowrap hover:border-aether/50 hover:text-parchment" onClick={() => applySuggestion(s)}>
+            <button key={`${s.label}-${i}`} className="chip chip-lg shrink-0 cursor-pointer whitespace-nowrap hover:border-aether/50 hover:text-parchment" onClick={() => applySuggestion(s)}>
               {s.label}
             </button>
           ))}
@@ -101,29 +102,29 @@ export function Composer({ view, staged, onStagedChange, suggestions, showSugges
         </div>
       )}
 
-      <div className="mb-2 flex flex-wrap gap-1">
+      <div className="mb-2 flex flex-wrap gap-2">
         {TEXT_MODES.map((m) => (
-          <button key={m.id} className={cx("chip cursor-pointer px-3 py-1", mode === m.id && "chip-active")} onClick={() => setMode(m.id)}>
+          <button key={m.id} className={cx("chip chip-lg cursor-pointer", mode === m.id && "chip-active")} onClick={() => setMode(m.id)}>
             {PART_ICON[m.id]} {m.label}
           </button>
         ))}
         <span className="mx-1 w-px bg-white/10" />
-        <button className="chip cursor-pointer px-3 py-1 hover:text-parchment" onClick={() => stage({ kind: "silent" })}>
+        <button className="chip chip-lg cursor-pointer hover:text-parchment" onClick={() => stage({ kind: "silent" })}>
           … Промолчать
         </button>
-        <button className={cx("chip cursor-pointer px-3 py-1 hover:text-parchment", picker === "emotion" && "chip-active")} onClick={() => setPicker(picker === "emotion" ? null : "emotion")}>
+        <button className={cx("chip chip-lg cursor-pointer hover:text-parchment", picker === "emotion" && "chip-active")} onClick={() => setPicker(picker === "emotion" ? null : "emotion")}>
           ♥ Эмоция
         </button>
-        <button className="chip cursor-pointer px-3 py-1 hover:text-parchment" onClick={() => setPicker("ability")}>
+        <button className="chip chip-lg cursor-pointer hover:text-parchment" onClick={() => setPicker("ability")}>
           ✦ Способность
         </button>
-        <button className="chip cursor-pointer px-3 py-1 hover:text-parchment" onClick={() => setPicker("item")}>
+        <button className="chip chip-lg cursor-pointer hover:text-parchment" onClick={() => setPicker("item")}>
           ◆ Предмет
         </button>
-        <button className={cx("chip cursor-pointer px-3 py-1 hover:text-parchment", picker === "travel" && "chip-active")} onClick={() => setPicker(picker === "travel" ? null : "travel")}>
+        <button className={cx("chip chip-lg cursor-pointer hover:text-parchment", picker === "travel" && "chip-active")} onClick={() => setPicker(picker === "travel" ? null : "travel")}>
           ➜ Путь
         </button>
-        <button className={cx("chip cursor-pointer px-3 py-1 hover:text-parchment", picker === "rest" && "chip-active")} onClick={() => setPicker(picker === "rest" ? null : "rest")}>
+        <button className={cx("chip chip-lg cursor-pointer hover:text-parchment", picker === "rest" && "chip-active")} onClick={() => setPicker(picker === "rest" ? null : "rest")}>
           ☾ Время
         </button>
       </div>
@@ -146,14 +147,15 @@ export function Composer({ view, staged, onStagedChange, suggestions, showSugges
           onKeyDown={onKey}
           aria-label={active.label}
         />
-        <button className="btn-ghost h-12" title="Добавить в комбинацию и продолжить" disabled={!text.trim() || busy || disabled} onClick={addText}>
+        <button className="btn-ghost h-12 px-4 text-lg" title="Добавить в комбинацию и продолжить" disabled={!text.trim() || busy || disabled} onClick={addText}>
           +
         </button>
-        <button className="btn-primary h-12 px-5" disabled={busy || disabled || (staged.length === 0 && !text.trim())} onClick={submit}>
+        <button className="btn-primary h-12 px-6 text-base" disabled={busy || disabled || (staged.length === 0 && !text.trim())} onClick={submit}>
           {busy ? <Spinner /> : "Ход"}
         </button>
       </div>
-      <p className="mt-1.5 text-[11px] text-fog">Enter — сделать ход, Shift+Enter — новая строка, «+» — добавить в комбинацию (например: Промолчать + Эмоция + Действие).</p>
+      <p className="mt-1.5 text-xs text-fog">Enter — сделать ход, Shift+Enter — новая строка, «+» — добавить в комбинацию (например: Промолчать + Эмоция + Действие).</p>
+      </div>
     </div>
   );
 }
@@ -169,7 +171,7 @@ function EmotionPicker({ onPick }: { onPick: (p: ActionPart) => void }) {
       </div>
       <div className="flex flex-wrap gap-1.5">
         {EMOTIONS.map((e) => (
-          <button key={e.id} className="chip cursor-pointer hover:border-rose/50 hover:text-parchment" onClick={() => onPick({ kind: "emotion", emotion: e.id as EmotionId, intensity })}>
+          <button key={e.id} className="chip chip-lg cursor-pointer hover:border-rose/50 hover:text-parchment" onClick={() => onPick({ kind: "emotion", emotion: e.id as EmotionId, intensity })}>
             {e.label}
           </button>
         ))}
@@ -183,7 +185,7 @@ function TravelPicker({ view, onPick }: { view: PlayerView; onPick: (p: ActionPa
   return (
     <div className="panel-raised mb-2 flex animate-fade-in flex-wrap gap-1.5 p-3">
       {view.location.connections.map((c) => (
-        <button key={c.id} className="chip cursor-pointer hover:text-parchment" onClick={() => onPick({ kind: "travel", locationId: c.id })}>
+        <button key={c.id} className="chip chip-lg cursor-pointer hover:text-parchment" onClick={() => onPick({ kind: "travel", locationId: c.id })}>
           {c.name} · {formatMinutes(c.minutes)}
         </button>
       ))}
@@ -215,15 +217,15 @@ function RestPicker({ view, onPick }: { view: PlayerView; onPick: (p: ActionPart
     <div className="panel-raised mb-2 animate-fade-in space-y-2 p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         {(Object.keys(REST_LABELS) as (keyof typeof REST_LABELS)[]).map((a) => (
-          <button key={a} className={cx("chip cursor-pointer", activity === a && "chip-active")} onClick={() => setActivity(a)}>
+          <button key={a} className={cx("chip chip-lg cursor-pointer", activity === a && "chip-active")} onClick={() => setActivity(a)}>
             {REST_LABELS[a]}
           </button>
         ))}
         <span className="mx-1 text-fog">·</span>
-        <button className={cx("chip cursor-pointer", mode === "for" && "chip-active")} onClick={() => setMode("for")}>
+        <button className={cx("chip chip-lg cursor-pointer", mode === "for" && "chip-active")} onClick={() => setMode("for")}>
           На срок
         </button>
-        <button className={cx("chip cursor-pointer", mode === "until" && "chip-active")} onClick={() => setMode("until")}>
+        <button className={cx("chip chip-lg cursor-pointer", mode === "until" && "chip-active")} onClick={() => setMode("until")}>
           До даты и времени
         </button>
       </div>
@@ -281,11 +283,11 @@ export function AbilityPicker({ open, view, onClose, onPick }: { open: boolean; 
         <input className="input max-w-xs" placeholder="Цель (необязательно)" value={target} onChange={(e) => setTarget(e.target.value)} />
       </div>
       <div className="mb-4 flex flex-wrap gap-1">
-        <button className={cx("chip cursor-pointer", !category && "chip-active")} onClick={() => setCategory(null)}>
+        <button className={cx("chip chip-lg cursor-pointer", !category && "chip-active")} onClick={() => setCategory(null)}>
           Все
         </button>
         {usedCategories.map((c) => (
-          <button key={c.id} className={cx("chip cursor-pointer", category === c.id && "chip-active")} onClick={() => setCategory(c.id)}>
+          <button key={c.id} className={cx("chip chip-lg cursor-pointer", category === c.id && "chip-active")} onClick={() => setCategory(c.id)}>
             {c.label}
           </button>
         ))}
@@ -334,11 +336,11 @@ export function ItemPicker({ open, view, onClose, onPick }: { open: boolean; vie
         <input className="input max-w-xs" placeholder="Кому / на что (для «Отдать», «Показать»)" value={target} onChange={(e) => setTarget(e.target.value)} />
       </div>
       <div className="mb-4 flex flex-wrap gap-1">
-        <button className={cx("chip cursor-pointer", !type && "chip-active")} onClick={() => setType(null)}>
+        <button className={cx("chip chip-lg cursor-pointer", !type && "chip-active")} onClick={() => setType(null)}>
           Все
         </button>
         {types.map((t) => (
-          <button key={t} className={cx("chip cursor-pointer", type === t && "chip-active")} onClick={() => setType(t)}>
+          <button key={t} className={cx("chip chip-lg cursor-pointer", type === t && "chip-active")} onClick={() => setType(t)}>
             {ITEM_TYPES[t] ?? t}
           </button>
         ))}

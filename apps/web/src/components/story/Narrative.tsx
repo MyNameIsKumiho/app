@@ -24,7 +24,7 @@ function SpeakerLine({ name, role, text, hero }: { name: string; role?: string; 
       className={cx("my-3 rounded-lg border-l-2 px-4 py-2 font-sans", hero && "ml-6")}
       style={{ borderColor: color, background: hero ? "color-mix(in oklab, var(--color-aether) 7%, transparent)" : `hsl(${hue} 60% 50% / 0.07)` }}
     >
-      <p className="mb-0.5 text-xs font-semibold tracking-wide" style={{ color }}>
+      <p className="mb-0.5 text-sm font-semibold tracking-wide" style={{ color }}>
         {name}
         {role && <span className="ml-1.5 font-normal opacity-70">· {role}</span>}
       </p>
@@ -179,14 +179,14 @@ export const TurnCard = memo(function TurnCard({
       {turn.action && !editing && (
         <div className="mb-3 flex flex-wrap justify-end gap-1.5">
           {turn.action.parts.map((p, i) => (
-            <span key={i} className="rounded-xl border border-aether/25 bg-aether/[0.08] px-3 py-1.5 text-sm text-parchment/90">
+            <span key={i} className="rounded-xl border border-aether/25 bg-aether/[0.08] px-3.5 py-2 text-[0.95rem] text-parchment/90">
               <span aria-hidden className="mr-1.5 text-aether">
                 {PART_ICON[p.kind]}
               </span>
               {describePart(p, view)}
             </span>
           ))}
-          <button className="btn-quiet px-2 text-xs opacity-60 hover:opacity-100" onClick={() => setEditing(true)} title="Изменить сообщение, и рассказчик перепишет ответ" aria-label="Изменить сообщение">
+          <button className="btn-quiet px-2.5 text-base opacity-60 hover:opacity-100" onClick={() => setEditing(true)} title="Изменить сообщение, и рассказчик перепишет ответ" aria-label="Изменить сообщение">
             ✎
           </button>
         </div>
@@ -196,12 +196,12 @@ export const TurnCard = memo(function TurnCard({
       <Report turn={turn} debug={debug} />
       <div className="mt-2 flex gap-1 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
         {!isHead && (
-          <button className="btn-quiet text-xs" onClick={() => onRewind(turn)}>
+          <button className="btn-quiet text-sm" onClick={() => onRewind(turn)}>
             ⟲ Вернуться к этому моменту
           </button>
         )}
         {canIllustrate && !turn.imageId && (
-          <button className="btn-quiet text-xs" disabled={illustrating} onClick={() => onIllustrate(turn)}>
+          <button className="btn-quiet text-sm" disabled={illustrating} onClick={() => onIllustrate(turn)}>
             {illustrating ? <Spinner className="size-3" /> : "🖼"} Иллюстрировать
           </button>
         )}
