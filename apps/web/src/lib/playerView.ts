@@ -9,6 +9,7 @@ import {
   timelineView,
   xpToNextLevel,
   type GameState,
+  withImprovised,
   type Scenario,
 } from "@aetherfall/core";
 
@@ -78,7 +79,7 @@ export interface PlayerView {
   };
 }
 
-const SLOT_LABELS: Record<string, string> = { weapon: "Оружие", body: "Тело", accessory: "Аксессуар", head: "Голова", hands: "Руки", feet: "Ноги", offhand: "Вторая рука" };
+const SLOT_LABELS: Record<string, string> = { weapon: "Оружие", body: "Тело", accessory: "Аксессуар", head: "Голова", hands: "Руки", held: "В руках", held2: "Во второй руке", feet: "Ноги", offhand: "Вторая рука" };
 export const slotLabel = (slot: string) => SLOT_LABELS[slot] ?? slot;
 
 function standing(value: number): string {
@@ -97,7 +98,8 @@ function remaining(state: GameState, expiresAt: number | undefined): string | nu
   return `${Math.round(minutes / 1440)} дн`;
 }
 
-export function buildPlayerView(scenario: Scenario, state: GameState): PlayerView {
+export function buildPlayerView(authored: Scenario, state: GameState): PlayerView {
+  const scenario = withImprovised(authored, state);
   const npcName = (id: string) => scenario.npcs.find((n) => n.id === id)?.name ?? id;
   const location = scenario.locations.find((l) => l.id === state.player.locationId);
   const stats = effectiveStats(state, scenario);
@@ -192,7 +194,11 @@ export function buildPlayerView(scenario: Scenario, state: GameState): PlayerVie
         },
       ];
     }),
-    equipment: scenario.mechanics.equipmentSlots.map((slot) => {
+    equipment: [
+      ...scenario.mechanics.equipmentSlots,
+      // Slots used during play that the scenario does not list (things held in hand).
+      ...Object.keys(state.player.equipment).filter((slot) => !scenario.mechanics.equipmentSlots.includes(slot)),
+    ].map((slot) => {
       const itemId = state.player.equipment[slot] ?? null;
       return { slot, itemId, name: itemId ? (findItem(scenario, itemId, state)?.name ?? itemId) : null };
     }),

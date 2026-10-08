@@ -2,7 +2,7 @@ import { EMOTIONS, intensityLabel, type ActionPart, type SuggestedAction } from 
 import type { PlayerView } from "./playerView";
 
 export const REST_LABELS = { wait: "Ждать", sleep: "Спать", train: "Тренироваться", study: "Учиться" } as const;
-export const ITEM_MODE_LABELS = { use: "Использовать", equip: "Надеть", unequip: "Снять", show: "Показать", give: "Отдать" } as const;
+export const ITEM_MODE_LABELS = { use: "Использовать", equip: "Надеть / взять в руки", unequip: "Убрать / снять", show: "Показать", give: "Отдать" } as const;
 
 /** Short human description of an action part, as shown in the composer and the story log. */
 export function describePart(part: ActionPart, view?: PlayerView): string {

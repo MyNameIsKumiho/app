@@ -17,7 +17,8 @@ export const TURN_RESULT_CONTRACT = `Ответь ОДНИМ JSON-объекто
     {"type":"ability_mastery","abilityId":"...","delta":2},
     {"type":"effect_add","name":"...","description":"...","durationMinutes":60},
     {"type":"effect_remove","name":"..."},
-    {"type":"move","locationId":"..."},
+    {"type":"move","locationId":"id-из-контекста"} | для нового места: {"type":"move","name":"Вокзал","description":"коротко о месте"},
+    {"type":"equip","itemId":"id предмета из инвентаря"}, {"type":"unequip","itemId":"..."},
     {"type":"flag","key":"...","value":true},
     {"type":"player_knowledge","fact":"что герой узнал"},
     {"type":"achievement","achievementId":"..."}, {"type":"title","titleId":"..."}
@@ -27,7 +28,7 @@ export const TURN_RESULT_CONTRACT = `Ответь ОДНИМ JSON-объекто
   "questChanges": [{"questId":"...","action":"start|complete_objective|complete|fail|note","objectiveId":"...","note":"..."}],
   "worldChanges": [{"description":"что изменилось в мире","importance":0-100,"flag":{"key":"...","value":true},"factionId":"...","reputationDelta":5}],
   "knowledgeChanges": [{"npcId":"...","fact":"что NPC узнал","secretId":"id секрета героя, если NPC его узнал","source":"player_told|observed|deduced|rumor"}],
-  "npcUpdates": [{"npcId":"...","mood":"раздражение","locationId":"...","present":true,"alive":true}],
+  "npcUpdates": [{"npcId":"...","mood":"раздражение","locationId":"...","present":true,"alive":true}] | для нового персонажа: {"name":"Имя","description":"кто это","appearance":"внешность","present":true},
   "timelineChanges": [{"eventId":"...","action":"cancel|modify","note":"почему"}],
   "sceneChange": {"title":"название новой сцены","newArc":"название новой арки, только при крупном повороте"},
   "suggestedActions": [{"label":"коротко, до 6 слов","kind":"say|do|think|silent|ability|item|free","text":"готовый текст действия"}],
@@ -35,6 +36,10 @@ export const TURN_RESULT_CONTRACT = `Ответь ОДНИМ JSON-объекто
 }
 Правила:
 - Используй только id, перечисленные в контексте. Пустые массивы можно опускать.
+- Если герой куда-то пришёл или переместился, ОБЯЗАТЕЛЬНО добавь "move". Места нет в контексте — укажи "name" и "description", движок создаст его.
+- Каждый персонаж, который появился в сцене или заговорил с героем (в том числе придуманный тобой или игроком), должен быть в npcUpdates с "present": true; новому персонажу укажи "name", "description" и "appearance". Ушедшим ставь "present": false.
+- Если герой достал, взял в руки или надел предмет из инвентаря — добавь "equip"; убрал — "unequip".
+- timeAdvanceMinutes — сколько реально прошло времени в сцене. Если игрок пишет «прошло 12 дней», это 17280 минут.
 - Не дублируй механику, которую движок уже применил (стоимость способностей, использованные предметы).
 - Изменения отношений небольшие (обычно ±1..10), только за реальные поступки.
 - "newMemories" для NPC — только для присутствующих NPC и только о том, что они видели или слышали.

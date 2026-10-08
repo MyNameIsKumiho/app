@@ -4,6 +4,7 @@ import type { Ability, Scenario } from "../domain/scenario";
 import { formatDuration } from "../domain/time";
 import { grantXp } from "./progression";
 import { addItem, applyEffect, changeResource, effectiveStats, findItem, itemQuantity, removeItem } from "./mutations";
+import { equipFromText, equipItem } from "./equipment";
 import { statedDurationMinutes } from "./statedTime";
 import { findRoute, markVisited } from "./world";
 
@@ -116,14 +117,18 @@ function resolveItem(state: GameState, scenario: Scenario, part: Extract<ActionP
         out.outcomes.push(`Использован предмет «${item.name}».`, ...effects);
         return `Использует «${item.name}»${target}. ${item.description}${effects.length ? ` Результат: ${effects.join("; ")}.` : ""}`;
       }
-      return `Использует предмет «${item.name}»${target}. ${item.description}`;
+      // A non-consumable thing being used is in the hero's hands (or worn) from now on.
+      const held = equipItem(state, scenario, item.id);
+      if (held.ok) out.outcomes.push(`Экипировано: «${item.name}».`);
+      return `Достаёт и использует предмет «${item.name}»${target}. ${item.description}`;
     }
     case "equip": {
-      if (item.type !== "equipment" || !item.slot) {
-        out.failures.push(`«${item.name}» нельзя экипировать.`);
-        return `Пытается надеть «${item.name}», но это невозможно.`;
+      // Items without a slot of their own are simply held in hand.
+      const res = equipItem(state, scenario, item.id);
+      if (!res.ok) {
+        out.failures.push(`«${item.name}» нельзя экипировать: ${res.reason}.`);
+        return `Пытается взять «${item.name}», но это невозможно.`;
       }
-      state.player.equipment[item.slot] = item.id;
       out.outcomes.push(`Экипировано: «${item.name}».`);
       return `Экипирует «${item.name}».`;
     }
@@ -243,6 +248,12 @@ export function resolvePlayerAction(state: GameState, scenario: Scenario, action
   if (stated > out.minutes) {
     out.minutes = stated;
     out.aiDescription += `\nИгрок явно указал, что проходит ${formatDuration(stated)}: время в мире уже сдвинуто на этот срок, опиши этот промежуток сжато.`;
+  }
+  // "Достаю палочку" puts the wand into the hero's hands.
+  const taken = action.parts.flatMap((p) => (p.kind === "do" || p.kind === "free" ? equipFromText(state, scenario, p.text) : []));
+  if (taken.length > 0) {
+    out.outcomes.push(`Экипировано: ${[...new Set(taken)].join(", ")}`);
+    out.aiDescription += `\nГерой теперь держит в руках или носит: ${[...new Set(taken)].join(", ")}.`;
   }
   out.minutes = Math.max(1, out.minutes);
   return out;

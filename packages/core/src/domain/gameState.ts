@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { IdSchema, ImportanceSchema } from "./common";
 import { GameTimeSchema } from "./time";
-import { ItemSchema, VisualProfileSchema } from "./scenario";
+import { ItemSchema, LocationSchema, NPCSchema, VisualProfileSchema } from "./scenario";
 
 /** Bumped when GameState structure changes; see scenario/migrations.ts. */
 export const GAME_STATE_VERSION = 1;
@@ -214,6 +214,9 @@ export const GameStateSchema = z.object({
   journal: JournalSchema.prefault({}),
   /** Improvised items that appeared during play. They never carry mechanical effects. */
   customItems: z.array(ItemSchema).default([]),
+  /** Places and characters that appeared during play without being in the scenario (see engine/improvised.ts). */
+  customLocations: z.array(LocationSchema).default([]),
+  customNpcs: z.array(NPCSchema).default([]),
   /** Monotonic counter for generated ids, keeps ids deterministic (good for tests and replays). */
   seq: z.number().int().min(0).default(0),
 });

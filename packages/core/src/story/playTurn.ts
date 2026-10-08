@@ -7,6 +7,7 @@ import type { TextGenerator } from "../ai/structured";
 import type { ApplyReport } from "../engine/applyTurnResult";
 import type { SecretLeak } from "../engine/secretGuard";
 import type { TimelineOutcome } from "../engine/timeline";
+import { withImprovised } from "../engine/improvised";
 import { finalizeTurn, prepareTurn } from "../engine/turn";
 import { compactMemory } from "../memory/memoryEngine";
 
@@ -35,7 +36,9 @@ export interface PlayedTurn {
  *   → validated changes applied → time & timeline → memory compaction.
  * The input state is never mutated; a new state is returned.
  */
-export async function playTurn(ai: TextGenerator, scenario: Scenario, state: GameState, action: PlayerAction, options: PlayTurnOptions = {}): Promise<PlayedTurn> {
+export async function playTurn(ai: TextGenerator, authored: Scenario, state: GameState, action: PlayerAction, options: PlayTurnOptions = {}): Promise<PlayedTurn> {
+  // Places and characters improvised in earlier turns count as part of the world.
+  const scenario = withImprovised(authored, state);
   const prepared = prepareTurn(state, scenario, action);
   const story = await runStoryTurn(ai, {
     scenario,

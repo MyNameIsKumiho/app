@@ -29,7 +29,16 @@ export const StateChangeSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("ability_mastery"), abilityId: z.string(), delta: z.number(), reason: z.string().default("") }),
   z.object({ type: z.literal("effect_add"), name: z.string(), description: z.string().default(""), durationMinutes: z.number().int().optional() }),
   z.object({ type: z.literal("effect_remove"), name: z.string() }),
-  z.object({ type: z.literal("move"), locationId: z.string() }),
+  z.object({
+    type: z.literal("move"),
+    locationId: z.string().default(""),
+    /** For a place the scenario does not have yet: it is created on the fly. */
+    name: z.string().optional(),
+    description: z.string().optional(),
+  }),
+  /** The hero takes an item in hand or puts it on. `slot` defaults to the item's own slot or "hands". */
+  z.object({ type: z.literal("equip"), itemId: z.string(), slot: z.string().optional() }),
+  z.object({ type: z.literal("unequip"), itemId: z.string() }),
   z.object({ type: z.literal("flag"), key: z.string(), value: FlagValue }),
   z.object({ type: z.literal("player_knowledge"), fact: z.string() }),
   z.object({ type: z.literal("achievement"), achievementId: z.string() }),
@@ -85,7 +94,11 @@ export const KnowledgeChangeSchema = z.object({
 export type KnowledgeChange = z.infer<typeof KnowledgeChangeSchema>;
 
 export const NPCUpdateSchema = z.object({
-  npcId: z.string(),
+  npcId: z.string().default(""),
+  /** For a character the scenario does not have yet: they are created on the fly. */
+  name: z.string().optional(),
+  description: z.string().optional(),
+  appearance: z.string().optional(),
   mood: z.string().optional(),
   locationId: z.string().optional(),
   alive: z.boolean().optional(),

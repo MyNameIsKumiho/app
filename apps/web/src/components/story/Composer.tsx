@@ -293,7 +293,7 @@ export function ItemPicker({ open, view, onClose, onPick }: { open: boolean; vie
       {view.inventory.length === 0 && <p className="text-sm text-mist">Инвентарь пуст.</p>}
       <div className="grid gap-2 sm:grid-cols-2">
         {list.map((i) => {
-          const modes: (keyof typeof ITEM_MODE_LABELS)[] = i.slot ? (i.equipped ? ["unequip", "show", "give"] : ["equip", "show", "give"]) : ["use", "show", "give"];
+          const modes: (keyof typeof ITEM_MODE_LABELS)[] = i.equipped ? ["use", "unequip", "show", "give"] : i.slot ? ["equip", "use", "show", "give"] : ["use", "equip", "show", "give"];
           return (
             <div key={i.id} className="panel-raised p-3">
               <p className="font-medium">

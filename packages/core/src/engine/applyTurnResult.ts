@@ -28,6 +28,8 @@ import {
   setFlag,
 } from "./mutations";
 import { applyRelationshipDelta, axisById, relationValue } from "./relationships";
+import { addImprovisedLocation, addImprovisedNpc, findLocationRef, findNpcRef } from "./improvised";
+import { equipItem, unequipItem } from "./equipment";
 import { markVisited } from "./world";
 
 export interface RejectedChange {
@@ -172,12 +174,17 @@ class Applier {
         if (before === state.player.activeEffects.length) return this.reject("effect_remove", change, "эффекта нет");
         return this.ok(`Эффект снят: ${change.name}`);
       }
-      case "move": {
-        const location = scenario.locations.find((l) => l.id === change.locationId);
-        if (!location) return this.reject("move", change, "неизвестная локация");
-        state.player.locationId = location.id;
-        markVisited(state, location.id, location.name);
-        return this.ok(`Локация: ${location.name}`);
+      case "move":
+        return this.move(change.locationId, change.name, change.description);
+      case "equip": {
+        const res = equipItem(state, scenario, change.itemId, change.slot);
+        if (!res.ok) return this.reject("equip", change, res.reason);
+        return this.ok(`Экипировано: ${res.name}`);
+      }
+      case "unequip": {
+        const name = unequipItem(state, scenario, change.itemId);
+        if (!name) return this.reject("unequip", change, "предмет не экипирован");
+        return this.ok(`Снято: ${name}`);
       }
       case "flag":
         setFlag(state, change.key.slice(0, 80), change.value);
@@ -205,6 +212,22 @@ class Applier {
         return this.ok(`Герой погиб: ${change.reason}`);
       }
     }
+  }
+
+  /** Moves the hero; an unknown place with a name becomes a new improvised location. */
+  move(ref: string, name?: string, description?: string): void {
+    const { state, scenario } = this;
+    let location = findLocationRef(scenario, ref) ?? (name ? findLocationRef(scenario, name) : undefined);
+    if (!location) {
+      const title = (name ?? ref).trim();
+      if (!title || /^[a-z0-9_-]+$/.test(title)) return this.reject("move", { locationId: ref, name }, "неизвестная локация без названия");
+      location = addImprovisedLocation(state, scenario, title, description);
+      this.ok(`Новое место: ${location.name}`);
+    }
+    if (state.player.locationId === location.id) return;
+    state.player.locationId = location.id;
+    markVisited(state, location.id, location.name);
+    this.ok(`Локация: ${location.name}`);
   }
 
   relationship(change: RelationshipChange): void {
@@ -352,8 +375,20 @@ class Applier {
 
   npcUpdate(update: NPCUpdate): void {
     const { state, scenario } = this;
-    const npc = state.npcs[update.npcId];
-    if (!npc) return this.reject("npc", update, "неизвестный NPC");
+    const def = findNpcRef(scenario, update.npcId) ?? (update.name ? findNpcRef(scenario, update.name) : undefined);
+    let npc = def ? state.npcs[def.id] : undefined;
+    if (def && !npc) {
+      // Authored NPC without runtime state yet (e.g. an older save).
+      npc = { id: def.id, alive: true, mood: def.startingMood, met: true, relationship: {}, knowledge: [], knownSecretIds: [], memories: [], notes: "" };
+      state.npcs[def.id] = npc;
+    }
+    if (!npc) {
+      if (!update.name?.trim()) return this.reject("npc", update, "неизвестный NPC без имени");
+      const created = addImprovisedNpc(state, scenario, { name: update.name.trim(), description: update.description, appearance: update.appearance });
+      npc = state.npcs[created.id]!;
+      this.ok(`Новый персонаж: ${created.name}`);
+      if (update.present === false) npc.locationId = undefined;
+    }
     if (update.alive === true && !npc.alive) return this.reject("npc", update, "мёртвые NPC не возвращаются без причины, заложенной сценарием");
     if (update.alive === false && npc.alive) {
       npc.alive = false;
@@ -362,8 +397,9 @@ class Applier {
     }
     if (update.mood) npc.mood = update.mood.slice(0, 40);
     if (update.locationId) {
-      if (!scenario.locations.some((l) => l.id === update.locationId)) return this.reject("npc", update, "неизвестная локация");
-      npc.locationId = update.locationId;
+      const location = findLocationRef(scenario, update.locationId);
+      if (!location) return this.reject("npc", update, "неизвестная локация");
+      npc.locationId = location.id;
     }
     if (update.present === true) npc.locationId = state.player.locationId;
     if (update.present === false && npc.locationId === state.player.locationId) npc.locationId = undefined;
@@ -388,6 +424,8 @@ class Applier {
 export function applyTurnResult(state: GameState, scenario: Scenario, result: TurnResult, ctx: ApplyContext): ApplyReport {
   const applier = new Applier(state, scenario, ctx);
   for (const change of result.stateChanges) applier.stateChange(change);
+  // A scene that names a new place moves the hero there, even without an explicit "move".
+  if (result.sceneChange?.locationId && !result.stateChanges.some((c) => c.type === "move")) applier.move(result.sceneChange.locationId);
   for (const change of result.questChanges) applier.quest(change);
   for (const update of result.npcUpdates) applier.npcUpdate(update);
   for (const change of result.relationshipChanges) applier.relationship(change);

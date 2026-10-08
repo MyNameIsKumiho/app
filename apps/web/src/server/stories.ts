@@ -18,6 +18,7 @@ import {
   type Scenario,
   type SuggestedAction,
   type TextGenerator,
+  withImprovised,
 } from "@aetherfall/core/server";
 import { buildPlayerView } from "@/lib/playerView";
 import type { PlayTurnResponse, SaveDTO, StoryCard, StoryDetail, TurnDTO, TurnReport } from "@/lib/types";
@@ -84,7 +85,7 @@ function toTurnDTO(row: TurnRow): TurnDTO {
 }
 
 function locationName(scenario: Scenario, state: GameState): string {
-  return scenario.locations.find((l) => l.id === state.player.locationId)?.name ?? state.player.locationId;
+  return [...scenario.locations, ...state.customLocations].find((l) => l.id === state.player.locationId)?.name ?? state.player.locationId;
 }
 
 function toStoryCard(row: StoryRow, scenario: Scenario): StoryCard {
@@ -389,8 +390,8 @@ export async function illustrateTurn(deps: StoryDeps, storyId: string, turnId: s
   const row = getStoryRow(db, storyId);
   const turn = getTurnRow(db, storyId, turnId);
   if (turn.imageId) return { imageId: turn.imageId };
-  const scenario = loadSnapshot(db, row.snapshotId);
   const state = parseState(turn.stateAfter);
+  const scenario = withImprovised(loadSnapshot(db, row.snapshotId), state);
   const location = scenario.locations.find((l) => l.id === state.player.locationId);
   const characters = [
     { name: state.player.name, profile: state.player.visualProfile, appearance: state.player.fields.appearance },
