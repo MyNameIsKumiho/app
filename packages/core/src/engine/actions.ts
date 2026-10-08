@@ -4,6 +4,7 @@ import type { Ability, Scenario } from "../domain/scenario";
 import { formatDuration } from "../domain/time";
 import { grantXp } from "./progression";
 import { addItem, applyEffect, changeResource, effectiveStats, findItem, itemQuantity, removeItem } from "./mutations";
+import { statedDurationMinutes } from "./statedTime";
 import { findRoute, markVisited } from "./world";
 
 /**
@@ -26,6 +27,9 @@ export interface ResolvedAction {
   usedAbilityIds: string[];
   levelUps: number[];
 }
+
+/** Longest skip a player can state in words ("прошло 12 дней"). */
+const MAX_STATED_MINUTES = 60 * 24 * 365;
 
 const BASE_MINUTES: Record<ActionPart["kind"], number> = {
   say: 2,
@@ -235,6 +239,11 @@ export function resolvePlayerAction(state: GameState, scenario: Scenario, action
   const described = action.parts.map((part) => describePart(state, scenario, part, out));
   out.summary = described.map((d) => d.summary).join(" + ");
   out.aiDescription = described.map((d, i) => `${i + 1}. ${d.ai}`).join("\n");
+  const stated = Math.min(MAX_STATED_MINUTES, Math.max(0, ...action.parts.map((p) => (p.kind === "do" || p.kind === "free" ? statedDurationMinutes(p.text) : 0))));
+  if (stated > out.minutes) {
+    out.minutes = stated;
+    out.aiDescription += `\nИгрок явно указал, что проходит ${formatDuration(stated)}: время в мире уже сдвинуто на этот срок, опиши этот промежуток сжато.`;
+  }
   out.minutes = Math.max(1, out.minutes);
   return out;
 }

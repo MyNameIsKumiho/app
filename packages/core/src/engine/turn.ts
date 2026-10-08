@@ -7,8 +7,8 @@ import { applyTurnResult, type ApplyReport } from "./applyTurnResult";
 import { advanceTime, type TimeAdvanceReport } from "./timeline";
 import { markVisited, presentNpcIds } from "./world";
 
-/** Hard cap so a single narrated scene cannot skip more than a week. */
-export const MAX_TURN_MINUTES = 60 * 24 * 7;
+/** Hard cap so a single turn cannot skip more than a year. */
+export const MAX_TURN_MINUTES = 60 * 24 * 365;
 export const RECENT_LOG_LIMIT = 8;
 
 export interface PreparedTurn {

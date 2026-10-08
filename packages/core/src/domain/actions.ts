@@ -33,7 +33,7 @@ export const ActionPartSchema = z.discriminatedUnion("kind", [
     target: z.string().max(500).optional(),
   }),
   z.object({ kind: z.literal("travel"), locationId: z.string().min(1) }),
-  z.object({ kind: z.literal("rest"), activity: z.enum(["wait", "sleep", "train", "study"]), minutes: z.number().int().min(5).max(60 * 24 * 7) }),
+  z.object({ kind: z.literal("rest"), activity: z.enum(["wait", "sleep", "train", "study"]), minutes: z.number().int().min(5).max(60 * 24 * 365) }),
   z.object({ kind: z.literal("free"), text: z.string().min(1).max(MAX_USER_TEXT) }),
 ]);
 export type ActionPart = z.infer<typeof ActionPartSchema>;
