@@ -20,6 +20,10 @@ export interface AIMessage {
   content: string;
 }
 
+/** Speed/intelligence tier the player picked. Each provider maps it to its own model and reasoning effort. */
+export type AISpeed = "fast" | "balanced" | "smart";
+export const AI_SPEEDS: readonly AISpeed[] = ["fast", "balanced", "smart"];
+
 export interface TextRequest {
   purpose: AIPurpose;
   system: string;
@@ -35,6 +39,10 @@ export interface TextRequest {
    */
   mockPayload?: unknown;
   signal?: AbortSignal;
+  /** Set by the router from the player's settings. */
+  speed?: AISpeed;
+  /** Exact model chosen by the player for this provider; overrides the speed preset's model. */
+  model?: string;
 }
 
 export interface TextResult {

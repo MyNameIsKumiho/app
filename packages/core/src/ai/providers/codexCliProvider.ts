@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { locateCodex } from "./codexLocator";
-import { AIError, redactSecrets, type AIProvider, type ProviderStatus, type TextRequest, type TextResult } from "../types";
+import { AIError, redactSecrets, type AIProvider, type AISpeed, type ProviderStatus, type TextRequest, type TextResult } from "../types";
 
 /**
  * "ChatGPT subscription" provider.
@@ -29,6 +29,9 @@ interface RunResult {
   stderr: string;
   timedOut: boolean;
 }
+
+/** Reasoning effort per speed tier; the model stays the one Codex is set to unless the player names one. */
+export const CODEX_SPEED_EFFORT: Record<AISpeed, "low" | "medium" | "high"> = { fast: "low", balanced: "medium", smart: "high" };
 
 /** One draft step is a few thousand tokens of JSON; give it room, but do not hang forever. */
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
@@ -134,7 +137,9 @@ export class CodexCliProvider implements AIProvider {
     ].join("\n\n");
     // The user's own MCP servers are not needed to write text, and each one would start a process per request.
     const args = ["exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "--color", "never", "--ignore-rules", "-c", "mcp_servers={}", "-o", outFile];
-    if (this.options.model) args.push("-m", this.options.model);
+    const model = request.model || this.options.model;
+    if (model) args.push("-m", model);
+    if (request.speed) args.push("-c", `model_reasoning_effort="${CODEX_SPEED_EFFORT[request.speed]}"`);
     args.push("-");
     try {
       const timeoutMs = this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -143,7 +148,7 @@ export class CodexCliProvider implements AIProvider {
       if (res.code !== 0) throw classify(`${res.stderr}\n${res.stdout}`);
       const text = (await readFile(outFile, "utf8").catch(() => res.stdout)).trim();
       if (!text) throw new AIError("invalid_output", "Codex CLI вернул пустой ответ", this.id);
-      return { text, providerId: this.id, model: this.options.model ?? "codex-default" };
+      return { text, providerId: this.id, model: `${model ?? "codex-default"}${request.speed ? ` · ${CODEX_SPEED_EFFORT[request.speed]}` : ""}` };
     } catch (error) {
       if (error instanceof AIError) throw error;
       throw new AIError("unavailable", `Не удалось запустить Codex CLI: ${redactSecrets((error as Error).message)}`, this.id);

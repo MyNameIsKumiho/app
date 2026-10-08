@@ -36,6 +36,7 @@ const newGame = () => createGameState(scenario, { name: "Рен", fields: { affi
 class ScriptedProvider implements AIProvider {
   readonly kind = "api" as const;
   calls = 0;
+  last?: TextRequest;
   constructor(readonly id: string, private readonly replies: (string | AIError)[]) {}
   get label() {
     return this.id;
@@ -43,7 +44,8 @@ class ScriptedProvider implements AIProvider {
   async status() {
     return { id: this.id, label: this.id, kind: this.kind, available: true, detail: "" };
   }
-  async generateText(_req: TextRequest) {
+  async generateText(req: TextRequest) {
+    this.last = req;
     const reply = this.replies[Math.min(this.calls, this.replies.length - 1)];
     this.calls += 1;
     if (reply instanceof AIError) throw reply;
@@ -89,6 +91,22 @@ describe("AI router", () => {
     await expect(new AIRouter(providers, { primary: "claude", fallback: "openai", autoOrder: [] }).generateText({ purpose: "summarize", system: "", messages: [] })).rejects.toMatchObject({ code: "invalid_request" });
     const quota = new ScriptedProvider("claude", [new AIError("quota", "no money")]);
     await expect(new AIRouter(new Map<string, AIProvider>([["claude", quota], ["openai", fallback]]), { primary: "claude", fallback: "disabled", autoOrder: [] }).generateText({ purpose: "summarize", system: "", messages: [] })).rejects.toMatchObject({ code: "quota" });
+  });
+
+  it("passes the player's speed and per-provider model to each provider", async () => {
+    const claude = new ScriptedProvider("claude", [new AIError("rate_limit", "429")]);
+    const openai = new ScriptedProvider("openai", ["ok"]);
+    const router = new AIRouter(new Map<string, AIProvider>([["claude", claude], ["openai", openai]]), {
+      primary: "claude",
+      fallback: "openai",
+      autoOrder: [],
+      speed: "fast",
+      models: { claude: "my-claude", openai: "" },
+    });
+    await router.generateText({ purpose: "summarize", system: "", messages: [] });
+    expect(claude.last).toMatchObject({ speed: "fast", model: "my-claude" });
+    expect(openai.last?.speed).toBe("fast");
+    expect(openai.last?.model).toBeUndefined();
   });
 
   it("auto mode prefers real providers over the mock", async () => {

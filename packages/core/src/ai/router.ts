@@ -1,4 +1,4 @@
-import { AIError, FALLBACK_ERROR_CODES, redactSecrets, type AIProvider, type ProviderStatus, type TextRequest, type TextResult } from "./types";
+import { AIError, FALLBACK_ERROR_CODES, redactSecrets, type AIProvider, type AISpeed, type ProviderStatus, type TextRequest, type TextResult } from "./types";
 
 export type StoryProviderChoice = string | "auto";
 export type FallbackChoice = string | "disabled";
@@ -10,6 +10,10 @@ export interface RouterSettings {
   fallback: FallbackChoice;
   /** Order used by "auto". The mock is only used when nothing else is available. */
   autoOrder: string[];
+  /** Speed tier for every call. */
+  speed?: AISpeed;
+  /** Exact model per provider id, set by the player (empty = use the speed preset). */
+  models?: Record<string, string | undefined>;
 }
 
 export interface RouterEvent {
@@ -65,7 +69,8 @@ export class AIRouter {
     for (const provider of chain) {
       const started = Date.now();
       try {
-        const result = await provider.generateText(request);
+        const model = this.settings.models?.[provider.id]?.trim();
+        const result = await provider.generateText({ ...request, speed: request.speed ?? this.settings.speed, ...(model ? { model } : {}) });
         this.record({ providerId: provider.id, ok: true, ms: Date.now() - started });
         return result;
       } catch (error) {

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { AIError, redactSecrets, type AIProvider, type ProviderStatus, type TextRequest, type TextResult } from "../types";
+import { AIError, redactSecrets, type AIProvider, type AISpeed, type ProviderStatus, type TextRequest, type TextResult } from "../types";
 
 export interface ClaudeProviderOptions {
   apiKey?: string;
@@ -10,6 +10,13 @@ export interface ClaudeProviderOptions {
 }
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
+
+/** Model and effort per speed tier. A model set on the server (ANTHROPIC_MODEL) replaces the preset model. */
+export const CLAUDE_SPEED_PRESETS: Record<AISpeed, { model: string; effort: "low" | "medium" | "high" }> = {
+  fast: { model: "claude-sonnet-5-5", effort: "low" },
+  balanced: { model: "claude-opus-5-5", effort: "medium" },
+  smart: { model: "claude-opus-5-5", effort: "high" },
+};
 
 function mapError(error: unknown): AIError {
   if (error instanceof AIError) return error;
@@ -39,6 +46,12 @@ export class ClaudeProvider implements AIProvider {
     this.model = options.model || DEFAULT_CLAUDE_MODEL;
   }
 
+  private pick(request: TextRequest): { model: string; effort: "low" | "medium" | "high" } {
+    if (!request.speed) return { model: request.model || this.model, effort: this.options.effort ?? "medium" };
+    const preset = CLAUDE_SPEED_PRESETS[request.speed];
+    return { model: request.model || this.options.model || preset.model, effort: preset.effort };
+  }
+
   async status(): Promise<ProviderStatus> {
     return {
       id: this.id,
@@ -51,14 +64,15 @@ export class ClaudeProvider implements AIProvider {
 
   async generateText(request: TextRequest): Promise<TextResult> {
     if (!this.client) throw new AIError("not_configured", "Claude API не настроен", this.id);
+    const { model, effort } = this.pick(request);
     try {
       const stream = this.client.beta.messages.stream(
         {
-          model: this.model,
+          model,
           max_tokens: request.maxOutputTokens ?? 8000,
           system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
           messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
-          output_config: { effort: this.options.effort ?? "medium" },
+          output_config: { effort },
           // Server-side refusal fallback, routed by refusal category.
           betas: ["server-side-fallback-2026-07-01"],
           fallbacks: "default",

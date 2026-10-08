@@ -5,6 +5,7 @@ export interface AIStatusDTO {
   fallback: { id: string; label: string } | null;
   usingMock: boolean;
   image: { id: string; label: string; mock: boolean };
+  speedPresets?: Record<string, Record<"fast" | "balanced" | "smart", string>>;
   desktopConfigFile: string | null;
   recentEvents: { providerId: string; ok: boolean; error?: string; code?: string; ms: number; at: number }[];
 }

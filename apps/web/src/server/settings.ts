@@ -17,6 +17,12 @@ export const AppSettingsSchema = z.object({
       fallback: z.string().default("disabled"),
       temperature: z.number().min(0).max(1).default(0.8),
       contextBudget: z.number().int().min(2000).max(60000).default(8000),
+      /** Fast but simpler, balanced, or slower but smarter. */
+      speed: z.enum(["fast", "balanced", "smart"]).default("balanced"),
+      /** Exact model per provider id; empty means "use the speed preset". Model names only, never keys. */
+      models: z
+        .object({ claude: z.string().trim().max(100).default(""), chatgpt: z.string().trim().max(100).default(""), openai: z.string().trim().max(100).default("") })
+        .prefault({}),
       /** Show provider/model and engine reports under each turn. */
       showDebug: z.boolean().default(false),
     })

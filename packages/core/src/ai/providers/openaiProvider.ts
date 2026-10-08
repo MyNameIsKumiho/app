@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AIError, redactSecrets, type AIProvider, type ProviderStatus, type TextRequest, type TextResult } from "../types";
+import { AIError, redactSecrets, type AIProvider, type AISpeed, type ProviderStatus, type TextRequest, type TextResult } from "../types";
 
 export interface OpenAIProviderOptions {
   apiKey?: string;
@@ -8,6 +8,13 @@ export interface OpenAIProviderOptions {
 }
 
 export const DEFAULT_OPENAI_MODEL = "gpt-5";
+
+/** Model and reasoning effort per speed tier. A model set on the server (OPENAI_MODEL) replaces the preset model. */
+export const OPENAI_SPEED_PRESETS: Record<AISpeed, { model: string; effort: "low" | "medium" | "high" }> = {
+  fast: { model: "gpt-5-mini", effort: "low" },
+  balanced: { model: "gpt-5", effort: "low" },
+  smart: { model: "gpt-5", effort: "high" },
+};
 
 function mapError(error: unknown): AIError {
   if (error instanceof AIError) return error;
@@ -31,10 +38,12 @@ export class OpenAIProvider implements AIProvider {
   readonly kind = "api" as const;
   private readonly client: OpenAI | null;
   private readonly model: string;
+  private readonly serverModel: string | undefined;
 
   constructor(options: OpenAIProviderOptions) {
     this.client = options.apiKey ? new OpenAI({ apiKey: options.apiKey, timeout: options.timeoutMs ?? 120_000, maxRetries: 1 }) : null;
     this.model = options.model || DEFAULT_OPENAI_MODEL;
+    this.serverModel = options.model || undefined;
   }
 
   async status(): Promise<ProviderStatus> {
@@ -49,10 +58,13 @@ export class OpenAIProvider implements AIProvider {
 
   async generateText(request: TextRequest): Promise<TextResult> {
     if (!this.client) throw new AIError("not_configured", "OpenAI API не настроен", this.id);
+    const preset = request.speed ? OPENAI_SPEED_PRESETS[request.speed] : null;
+    const model = request.model || this.serverModel || preset?.model || this.model;
     try {
       const response = await this.client.responses.create(
         {
-          model: this.model,
+          model,
+          ...(preset ? { reasoning: { effort: preset.effort } } : {}),
           instructions: request.system,
           input: request.messages.map((m) => ({ role: m.role, content: m.content })),
           max_output_tokens: request.maxOutputTokens ?? 8000,

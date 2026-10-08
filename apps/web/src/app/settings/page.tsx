@@ -8,12 +8,32 @@ import { api } from "@/lib/api";
 import type { AIStatusDTO } from "@/lib/aiStatus";
 
 interface SettingsDTO {
-  ai: { primary: string; fallback: string; temperature: number; contextBudget: number; showDebug: boolean };
+  ai: {
+    primary: string;
+    fallback: string;
+    temperature: number;
+    contextBudget: number;
+    showDebug: boolean;
+    speed: Speed;
+    models: { claude: string; chatgpt: string; openai: string };
+  };
   images: { mode: "never" | "manual" | "important" | "frequent"; provider: "auto" | "openai" | "mock" };
   gameplay: { autosave: boolean; autosaveSlots: number; showSuggestions: boolean };
   profile: { authorName: string };
 }
 type Patch = { [K in keyof SettingsDTO]?: Partial<SettingsDTO[K]> };
+
+type Speed = "fast" | "balanced" | "smart";
+const SPEEDS: { id: Speed; label: string; hint: string }[] = [
+  { id: "fast", label: "Быстрая", hint: "Отвечает быстрее, но проще и чаще ошибается" },
+  { id: "balanced", label: "Средняя", hint: "Средняя скорость и средний ум" },
+  { id: "smart", label: "Умная", hint: "Дольше думает, зато глубже и точнее" },
+];
+const MODEL_PROVIDERS = [
+  { id: "claude", label: "Claude API", placeholder: "например claude-sonnet-5-5" },
+  { id: "chatgpt", label: "ChatGPT (Codex)", placeholder: "пусто = модель Codex по умолчанию" },
+  { id: "openai", label: "OpenAI API", placeholder: "например gpt-5-mini" },
+] as const;
 
 const KIND_LABEL = { api: "API-ключ", subscription: "Подписка", mock: "Без AI" } as const;
 
@@ -103,7 +123,48 @@ export default function SettingsPage() {
           </Field>
         </div>
 
-        <details className="mt-6 rounded-xl border border-white/[0.06] p-4 text-sm">
+        <div className="mt-6">
+          <p className="mb-2 text-sm font-medium">Скорость и ум модели</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {SPEEDS.map((sp) => {
+              const activeId = status.data?.active?.id;
+              const preset = activeId ? status.data?.speedPresets?.[activeId]?.[sp.id] : undefined;
+              const custom = activeId ? s.ai.models[activeId as keyof SettingsDTO["ai"]["models"]] : "";
+              return (
+                <button
+                  key={sp.id}
+                  className={cx("panel-raised cursor-pointer p-3 text-left transition hover:border-aether/40", s.ai.speed === sp.id && "border-aether/60 bg-aether/[0.06]")}
+                  onClick={() => update.mutate({ ai: { speed: sp.id } })}
+                  aria-pressed={s.ai.speed === sp.id}
+                >
+                  <p className="font-medium">{sp.label}</p>
+                  <p className="mt-0.5 text-xs text-mist">{sp.hint}</p>
+                  {preset && <p className="mt-1.5 text-xs text-fog">{custom ? `${custom} · ` : ""}{custom ? preset.split(" · ").slice(1).join(" · ") : preset}</p>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <details className="mt-4 rounded-xl border border-white/[0.06] p-4 text-sm">
+          <summary className="cursor-pointer font-medium">Выбрать модель вручную</summary>
+          <p className="mt-2 text-xs text-fog">Оставьте пустым, чтобы модель подбиралась по скорости выше. Здесь только название модели, не ключ.</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {MODEL_PROVIDERS.map((p) => (
+              <Field key={p.id} label={p.label}>
+                <input
+                  className="input"
+                  defaultValue={s.ai.models[p.id]}
+                  placeholder={p.placeholder}
+                  maxLength={100}
+                  onBlur={(e) => e.currentTarget.value.trim() !== s.ai.models[p.id] && update.mutate({ ai: { models: { ...s.ai.models, [p.id]: e.currentTarget.value.trim() } } })}
+                />
+              </Field>
+            ))}
+          </div>
+        </details>
+
+        <details className="mt-4 rounded-xl border border-white/[0.06] p-4 text-sm">
           <summary className="cursor-pointer font-medium">Как подключить AI</summary>
           <div className="mt-3 space-y-3 text-mist">
             {status.data?.desktopConfigFile ? (
