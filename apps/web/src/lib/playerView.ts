@@ -22,6 +22,8 @@ export interface PlayerView {
   scenario: { id: string; title: string; version: string; authorName: string };
   turn: number;
   time: string;
+  /** Current moment and the scenario's calendar, for the "skip until" picker. */
+  clock: { now: { year: number; month: number; day: number; hour: number; minute: number }; calendar: { monthNames: string[]; daysPerMonth: number; hoursPerDay: number; yearLabel: string } };
   alive: boolean;
   scene: { title: string; arc: string };
   location: { id: string; name: string; description: string; region: string; connections: { id: string; name: string; minutes: number }[] };
@@ -120,6 +122,7 @@ export function buildPlayerView(authored: Scenario, state: GameState): PlayerVie
     scenario: { id: scenario.id, title: scenario.metadata.title, version: scenario.version, authorName: scenario.metadata.authorName },
     turn: state.turn,
     time: formatGameTime(state.time, scenario.calendar),
+    clock: { now: { ...state.time }, calendar: { ...scenario.calendar, monthNames: [...scenario.calendar.monthNames] } },
     alive: state.player.alive,
     scene: { title: state.memory.currentScene.title, arc: state.memory.currentArc.title },
     location: {

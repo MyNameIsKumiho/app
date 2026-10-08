@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { EMOTIONS, type ActionPart, type EmotionId, type SuggestedAction } from "@aetherfall/core";
+import { EMOTIONS, formatGameTime, fromMinutes as fromClock, toMinutes, type ActionPart, type EmotionId, type SuggestedAction } from "@aetherfall/core";
 import { ITEM_MODE_LABELS, PART_ICON, REST_LABELS, describePart, formatMinutes, suggestionToPart } from "@/lib/actions";
 import type { PlayerView } from "@/lib/playerView";
 import { Modal, Spinner, cx } from "@/components/ui";
@@ -130,7 +130,7 @@ export function Composer({ view, staged, onStagedChange, suggestions, showSugges
 
       {picker === "emotion" && <EmotionPicker onPick={stage} />}
       {picker === "travel" && <TravelPicker view={view} onPick={stage} />}
-      {picker === "rest" && <RestPicker onPick={stage} />}
+      {picker === "rest" && <RestPicker view={view} onPick={stage} />}
       <AbilityPicker open={picker === "ability"} view={view} onClose={() => setPicker(null)} onPick={stage} />
       <ItemPicker open={picker === "item"} view={view} onClose={() => setPicker(null)} onPick={stage} />
 
@@ -191,26 +191,79 @@ function TravelPicker({ view, onPick }: { view: PlayerView; onPick: (p: ActionPa
   );
 }
 
-function RestPicker({ onPick }: { onPick: (p: ActionPart) => void }) {
+const MAX_SKIP_MINUTES = 60 * 24 * 365;
+const UNIT_MINUTES = { min: 1, hour: 60, day: 60 * 24 } as const;
+const UNIT_LABELS = { min: "минут", hour: "часов", day: "дней" } as const;
+
+function RestPicker({ view, onPick }: { view: PlayerView; onPick: (p: ActionPart) => void }) {
+  const { now, calendar } = view.clock;
   const [activity, setActivity] = useState<keyof typeof REST_LABELS>("wait");
-  const [minutes, setMinutes] = useState(60);
+  const [mode, setMode] = useState<"for" | "until">("for");
+  const [amount, setAmount] = useState(1);
+  const [unit, setUnit] = useState<keyof typeof UNIT_MINUTES>("hour");
+  const [target, setTarget] = useState({ ...now, minute: 0, hour: (now.hour + 1) % calendar.hoursPerDay, day: now.hour + 1 >= calendar.hoursPerDay ? now.day + 1 : now.day });
+
+  const minutes =
+    mode === "for"
+      ? Math.round(amount * UNIT_MINUTES[unit])
+      : toMinutes({ ...target, day: Math.min(target.day, calendar.daysPerMonth) }, calendar) - toMinutes(now, calendar);
+  const error = minutes < 5 ? (mode === "until" ? "Эта дата уже прошла или слишком близко" : "Минимум 5 минут") : minutes > MAX_SKIP_MINUTES ? "Не больше года за раз" : null;
+  const setT = (patch: Partial<typeof target>) => setTarget((t) => ({ ...t, ...patch }));
+  const num = (v: string, min: number, max: number) => Math.max(min, Math.min(max, Math.floor(Number(v) || min)));
+
   return (
-    <div className="panel-raised mb-2 flex animate-fade-in flex-wrap items-center gap-2 p-3 text-sm">
-      {(Object.keys(REST_LABELS) as (keyof typeof REST_LABELS)[]).map((a) => (
-        <button key={a} className={cx("chip cursor-pointer", activity === a && "chip-active")} onClick={() => setActivity(a)}>
-          {REST_LABELS[a]}
-        </button>
-      ))}
-      <select className="input w-auto py-1" value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} aria-label="Длительность">
-        {[15, 30, 60, 120, 240, 480, 1440, 4320, 10080].map((m) => (
-          <option key={m} value={m}>
-            {formatMinutes(m)}
-          </option>
+    <div className="panel-raised mb-2 animate-fade-in space-y-2 p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        {(Object.keys(REST_LABELS) as (keyof typeof REST_LABELS)[]).map((a) => (
+          <button key={a} className={cx("chip cursor-pointer", activity === a && "chip-active")} onClick={() => setActivity(a)}>
+            {REST_LABELS[a]}
+          </button>
         ))}
-      </select>
-      <button className="btn-ghost py-1" onClick={() => onPick({ kind: "rest", activity, minutes })}>
-        Добавить
-      </button>
+        <span className="mx-1 text-fog">·</span>
+        <button className={cx("chip cursor-pointer", mode === "for" && "chip-active")} onClick={() => setMode("for")}>
+          На срок
+        </button>
+        <button className={cx("chip cursor-pointer", mode === "until" && "chip-active")} onClick={() => setMode("until")}>
+          До даты и времени
+        </button>
+      </div>
+      {mode === "for" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <input className="input w-24 py-1" type="number" min={1} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))} aria-label="Сколько" />
+          <select className="input w-auto py-1" value={unit} onChange={(e) => setUnit(e.target.value as keyof typeof UNIT_MINUTES)} aria-label="Единица">
+            {(Object.keys(UNIT_LABELS) as (keyof typeof UNIT_LABELS)[]).map((u) => (
+              <option key={u} value={u}>
+                {UNIT_LABELS[u]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <input className="input w-16 py-1" type="number" min={1} max={calendar.daysPerMonth} value={target.day} onChange={(e) => setT({ day: num(e.target.value, 1, calendar.daysPerMonth) })} aria-label="День" />
+          <select className="input w-auto py-1" value={target.month} onChange={(e) => setT({ month: Number(e.target.value) })} aria-label="Месяц">
+            {calendar.monthNames.map((name, i) => (
+              <option key={name + i} value={i + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <span className="text-fog">{calendar.yearLabel}</span>
+          <input className="input w-20 py-1" type="number" min={now.year} value={target.year} onChange={(e) => setT({ year: num(e.target.value, now.year, now.year + 2) })} aria-label="Год" />
+          <span className="text-fog">в</span>
+          <input className="input w-16 py-1" type="number" min={0} max={calendar.hoursPerDay - 1} value={target.hour} onChange={(e) => setT({ hour: num(e.target.value, 0, calendar.hoursPerDay - 1) })} aria-label="Час" />
+          <span>:</span>
+          <input className="input w-16 py-1" type="number" min={0} max={59} step={5} value={String(target.minute).padStart(2, "0")} onChange={(e) => setT({ minute: num(e.target.value, 0, 59) })} aria-label="Минуты" />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <p className={cx("text-xs", error ? "text-ember" : "text-fog")}>
+          {error ?? `Пройдёт ${formatMinutes(minutes)} · будет ${formatGameTime(fromClock(toMinutes(now, calendar) + minutes, calendar), calendar)}`}
+        </p>
+        <button className="btn-ghost ml-auto py-1" disabled={error !== null} onClick={() => onPick({ kind: "rest", activity, minutes })}>
+          Добавить
+        </button>
+      </div>
     </div>
   );
 }
